@@ -5,7 +5,6 @@ Adafruit_DCMotor *left = AFMS.getMotor(1);
 Adafruit_DCMotor *right = AFMS.getMotor(2);
 
 //define constant
-
 bool run_once = false;
 int low_speed = 0;
 int high_speed = 255;
