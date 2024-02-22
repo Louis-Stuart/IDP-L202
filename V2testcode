@@ -2,8 +2,8 @@
 
 
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
-Adafruit_DCMotor *left = AFMS.getMotor(1);
-Adafruit_DCMotor *right = AFMS.getMotor(2);
+Adafruit_DCMotor *leftMotor = AFMS.getMotor(1);
+Adafruit_DCMotor *rightMotor = AFMS.getMotor(2);
 int leftmostlinesensorPin = 0;
 int leftlinesensorPin = 1;
 int rightlinesensorPin = 2;
@@ -16,16 +16,18 @@ int lineSensors[4];
 bool run_once = false;
 int low_speed = 0;
 int high_speed = 255;
+char forward = BACKWARD;
+char backward = FORWARD;
 
 //predefine function
 void lineSensorRead();
 void lineFollowingStraight();
-void stop(int t=0)
+void stop(int t=0);
 void straight(int speed=high_speed, int t=0);
 void reverse(int speed=high_speed, int t=0);
-void turn(int high=high_speed, int low=low_speed, bool left);
-void turn_r();
-void turn_l();
+void turn(int high, int low, bool left);
+void turn_right();
+void turn_left();
 
 void setup() {
   Serial.begin(9600);           
@@ -42,45 +44,43 @@ void setup() {
 
 //main
 void loop() {
-  if (!run_once) { // run the start code only once
-      //test any function by adding it in
-      line_following();
-      run_once = true;
-  }
+  //test any function by adding it in
+  lineFollowingStraight();
 }
 
 void stop(int t=0) {
-  left->setSpeed(0);
-  right->setSpeed(0);
+  leftMotor->setSpeed(0);
+  rightMotor->setSpeed(0);
+  //might need to run(release)
   delay(t);
 }
 
 void straight(int speed=high_speed, int t=0) {
-  left->setSpeed(speed);
-  right->setSpeed(speed);
-  left->run(FORWARD);
-  right->run(FORWARD);
+  leftMotor->run(forward);
+  rightMotor->run(forward);
+  leftMotor->setSpeed(speed);
+  rightMotor->setSpeed(speed);
   delay(t);
 }
 
 void reverse(int speed=high_speed, int t=0) {
-  left->setSpeed(speed);
-  right->setSpeed(speed);
-  left->run(BACKWARD);
-  right->run(BACKWARD);
+  leftMotor->run(backward);
+  rightMotor->run(backward);
+  leftMotor->setSpeed(speed);
+  rightMotor->setSpeed(speed);
   delay(t); 
 }
 
-void turn(int high=high_speed, int low=low_speed, bool left) {
+void turn(int high, int low, bool left) {
+  leftMotor->run(forward);
+  rightMotor->run(forward);
   if(left){
-    left->setSpeed(high);
-    right->setSpeed(low);
+    leftMotor->setSpeed(high);
+    rightMotor->setSpeed(low);
   }else{
-    left->setSpeed(low);
-    right->setSpeed(high);
+    leftMotor->setSpeed(low);
+    rightMotor->setSpeed(high);
   }
-  left->run(FORWARD);
-  right->run(FORWARD);
 }
 
 void turn_left() {
@@ -101,14 +101,20 @@ void lineSensorRead(){
 
 
 void lineFollowingStraight() {
-  if (lineSensors[0]&&lineSensors[1]&&lineSensors[2]&&lineSensors[3]){
+  lineSensorRead();
+  Serial.print(lineSensors[0]);
+  Serial.print(lineSensors[1]);
+  Serial.print(lineSensors[2]);
+  Serial.println(lineSensors[3]);
+  if (!lineSensors[0] && !lineSensors[1] && !lineSensors[2] && !lineSensors[3]){
     straight();
   }
-  if (lineSensors[1] == 1) {
+
+  if (!lineSensors[0] && lineSensors[1] && !lineSensors[2] && !lineSensors[3]) {
     turn_left();
   }
 
-  if (lineSensors[2] == 1) {
+  if (!lineSensors[0] && !lineSensors[1] && lineSensors[2] && !lineSensors[3]) {
     turn_right();
   }
 
