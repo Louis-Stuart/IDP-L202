@@ -2,8 +2,8 @@
 
 
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
-Adafruit_DCMotor *left = AFMS.getMotor(1);
-Adafruit_DCMotor *right = AFMS.getMotor(2);
+Adafruit_DCMotor *leftMotor = AFMS.getMotor(1);
+Adafruit_DCMotor *rightMotor = AFMS.getMotor(2);
 int leftmostlinesensorPin = 0;
 int leftlinesensorPin = 1;
 int rightlinesensorPin = 2;
@@ -13,19 +13,47 @@ int rightmostlinesensorPin = 3;
 //define constant
 
 int lineSensors[4];
-bool run_once = false;
-int low_speed = 0;
-int high_speed = 255;
+bool runOnce = false;
+int lowSpeed = 0;
+int highSpeed = 255;
+int medSpeed = 180;
+char forward = BACKWARD;
+char backward = FORWARD;
+int counter = 0;
+
+
+//predefining navigation arrays
+char [startP1] = {Str, S, L , R, X};
+char [P1Green] = {B, L, L, X};
+char [P1Red] = {B, R, S, R, X};
+char [greenP2] = {Rot, S, S, R, R, X}; //assuming rotation
+char [redP2] = {Rot, S, S, S, L, R, X}; //assuming rotation
+char [P2Green] = {B, R, L, S, S, X};
+char [P2Red] = {B, R, R, S, S, S, X};
+char [greenP3] = {Rot, S, S, S, R, X}; //assuming rotation
+char [redP3] = {Rot, S, S, L, X}; //assuming rotation
+char [P3Green] = {B, R, S, S, S, X};
+char [P3Red] = {B, L, S, S, X};
+char [greenP4] = {Rot, S, R, S, R, X}; //assuming rotation
+char [redP4] = {Rot, S, L, L, X}; //assuming rotation
+char [P4Green] = {B, R, S, L, S, X};
+char [P4Red] = {B, L, R, S, X};
+char [redFinish] = {Rot, L, L, X}; //assuming rotation
+char [greenFinish] = {Rot, R, S, R, X}; //assuming rotation
+
 
 //predefine function
 void lineSensorRead();
 void lineFollowingStraight();
-void stop(int t=0)
-void straight(int speed=high_speed, int t=0);
-void reverse(int speed=high_speed, int t=0);
-void turn(int high=high_speed, int low=low_speed, bool left);
-void turn_r();
-void turn_l();
+void stop(int t=0);
+void straight(int speed=highSpeed, int t=0);
+void reverse(int speed=highSpeed, int t=0);
+void turn(int high, int low, bool left);
+void turn_right();
+void turn_left();
+void travellingRound();
+void navDecision();
+void actionTranslate(); 
 
 void setup() {
   Serial.begin(9600);           
@@ -42,53 +70,52 @@ void setup() {
 
 //main
 void loop() {
-  if (!run_once) { // run the start code only once
-      //test any function by adding it in
-      line_following();
-      run_once = true;
-  }
+  //test any function by adding it in
+  travellingRound();
 }
 
 void stop(int t=0) {
-  left->setSpeed(0);
-  right->setSpeed(0);
+  leftMotor->setSpeed(0);
+  rightMotor->setSpeed(0);
+  //might need to run(release)
   delay(t);
 }
 
-void straight(int speed=high_speed, int t=0) {
-  left->setSpeed(speed);
-  right->setSpeed(speed);
-  left->run(FORWARD);
-  right->run(FORWARD);
+void straight(int speed=highSpeed, int t=0) {
+  leftMotor->run(forward);
+  rightMotor->run(forward);
+  leftMotor->setSpeed(speed);
+  rightMotor->setSpeed(speed);
   delay(t);
 }
 
-void reverse(int speed=high_speed, int t=0) {
-  left->setSpeed(speed);
-  right->setSpeed(speed);
-  left->run(BACKWARD);
-  right->run(BACKWARD);
+void reverse(int speed=highSpeed, int t=0) {
+  leftMotor->run(backward);
+  rightMotor->run(backward);
+  leftMotor->setSpeed(speed);
+  rightMotor->setSpeed(speed);
   delay(t); 
 }
 
-void turn(int high=high_speed, int low=low_speed, bool left) {
+void turn(int high, int low, bool left, int t=0) {
+  leftMotor->run(forward);
+  rightMotor->run(forward);
   if(left){
-    left->setSpeed(high);
-    right->setSpeed(low);
+    leftMotor->setSpeed(high);
+    rightMotor->setSpeed(low);
   }else{
-    left->setSpeed(low);
-    right->setSpeed(high);
+    leftMotor->setSpeed(low);
+    rightMotor->setSpeed(high);
   }
-  left->run(FORWARD);
-  right->run(FORWARD);
+  delay(t)
 }
 
 void turn_left() {
-  turn(high_speed,low_speed,true);
+  turn(highSpeed,low_speed,true);
 }
 
 void turn_right() {
-  turn(high_speed,low_speed,false);
+  turn(highSpeed,low_speed,false);
 }
 
 
@@ -101,15 +128,122 @@ void lineSensorRead(){
 
 
 void lineFollowingStraight() {
-  if (lineSensors[0]&&lineSensors[1]&&lineSensors[2]&&lineSensors[3]){
+  lineSensorRead();
+  Serial.print(lineSensors[0]);
+  Serial.print(lineSensors[1]);
+  Serial.print(lineSensors[2]);
+  Serial.println(lineSensors[3]);
+  // line sensing based on the two middle sensors always picking up white 
+  if (!lineSensors[0] && lineSensors[1] && lineSensors[2] && !lineSensors[3]){
+    // sensor0=0, sensor1=1, sensor2=1, sensor3=0
     straight();
   }
-  if (lineSensors[1] == 1) {
+
+  // correction for staying on the line
+  if (!lineSensors[0] && lineSensors[1] && !lineSensors[2] && !lineSensors[3]) {
+    // sensor0=0, sensor1=1, sensor2=0, sensor3=0
     turn_left();
   }
 
-  if (lineSensors[2] == 1) {
+  // correction for staying on the line
+  if (!lineSensors[0] && !lineSensors[1] && lineSensors[2] && !lineSensors[3]) {
+    // sensor0=0, sensor1=0, sensor2=1, sensor3=0
     turn_right();
   }
 
+  // in case of a double t junction so all four see white
+  if (lineSensors[0] && lineSensors[1] && lineSensors[2] && lineSensors[3]){
+    // sensor0=1, sensor1=1, sensor2=1, sensor3=1
+    //consult the navigation location
+  }
+
+  // in case of a single right t junction 
+  if (!lineSensors[0] && lineSensors[1] && lineSensors[2] && lineSensors[3]){
+    // sensor0=0, sensor1=1, sensor2=1, sensor3=1
+    //consult the navigation location
+  }
+
+  // in case of a single left t junction 
+  if (lineSensors[0] && lineSensors[1] && lineSensors[2] && !lineSensors[3]){
+    // sensor0=1, sensor1=1, sensor2=1, sensor3=0
+    //consult the navigation location
+  }
+
 }
+
+void travellingRound() {
+
+}
+
+void navDecision(route) {
+    lineSensorRead();
+    int routeSize = sizeof(route) / sizeof(route[0]);
+    for (int i = 0; i < arraySize; ++i) {
+        actionTranslate(route[i]);
+    }
+}
+
+void actionTranslate(action) {
+  //Str is for travelling straight for a given time, not line following
+    if (action == 'Str') {
+      straight(speed=highSpeed, t=2000);
+    }
+    //S is for going straight using line following code, but this is only for when you're ignoring a turn to go straight
+    if (action == 'S') {
+      if (!lineSensors[0] && lineSensors[1] && lineSensors[2] && !lineSensors[3]){
+        // sensor0=0, sensor1=1, sensor2=1, sensor3=0
+        straight();
+      }
+      if (!lineSensors[0] && lineSensors[0] && lineSensors[0] && !lineSensors[3]){
+        // sensor0=0, sensor1=1, sensor2=1, sensor3=0
+        straight(speed=medSpeed, t=2000);
+      }
+      if (!lineSensors[0] &&  lineSensors[3]){
+        // sensor0=0, sensor3=1
+        stop(t=1000);
+      }
+      if (lineSensors[0] &&  !lineSensors[3]){
+        // sensor0=1, sensor3=0
+        stop(t=1000);
+      }
+      if (lineSensors[0] && lineSensors[3]){
+        // sensor0=1, sensor3=1
+        stop(t=1000);
+      }
+    }
+    //L is for turning left
+    if (action == 'L') {
+      turn_left();
+      delay(1000)
+      if (!lineSensors[0] && lineSensors[1] && lineSensors[2] && !lineSensors[3]){
+        // sensor0=0, sensor1=1, sensor2=1, sensor3=0
+        stop(t=1000);
+      }
+    }
+    //R is for turning right
+    if (action == 'R') {
+      turn_right(t=1000);
+      if (!lineSensors[0] && lineSensors[1] && lineSensors[2] && !lineSensors[3]){
+        // sensor0=0, sensor1=1, sensor2=1, sensor3=0
+        stop(t=1000);
+      }
+    }
+    //B is for back, so reversing
+    if (action == 'B') {
+      reverse();
+      if (lineSensors[0] && lineSensors[1] && lineSensors[2] && lineSensors[3]) {
+        stop();
+      }
+    //Rot is for a 180 degree rotation, so for leaving the bays exclusively
+    if (action == 'Rot') {
+      turn_right();
+      if (!lineSensors[0] && lineSensors[1] && lineSensors[2] && !lineSensors[3]) {
+        stop();
+      }
+    }  
+    if (action == 'X') {
+      break;
+    }
+}
+
+
