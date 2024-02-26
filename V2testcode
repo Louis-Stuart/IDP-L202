@@ -23,23 +23,23 @@ int counter = 0;
 
 
 //predefining navigation arrays
-char [startP1] = {Str, S, L , R, X};
-char [P1Green] = {B, L, L, X};
-char [P1Red] = {B, R, S, R, X};
-char [greenP2] = {Rot, S, S, R, R, X}; //assuming rotation
-char [redP2] = {Rot, S, S, S, L, R, X}; //assuming rotation
-char [P2Green] = {B, R, L, S, S, X};
-char [P2Red] = {B, R, R, S, S, S, X};
-char [greenP3] = {Rot, S, S, S, R, X}; //assuming rotation
-char [redP3] = {Rot, S, S, L, X}; //assuming rotation
-char [P3Green] = {B, R, S, S, S, X};
-char [P3Red] = {B, L, S, S, X};
-char [greenP4] = {Rot, S, R, S, R, X}; //assuming rotation
-char [redP4] = {Rot, S, L, L, X}; //assuming rotation
-char [P4Green] = {B, R, S, L, S, X};
-char [P4Red] = {B, L, R, S, X};
-char [redFinish] = {Rot, L, L, X}; //assuming rotation
-char [greenFinish] = {Rot, R, S, R, X}; //assuming rotation
+
+
+const char* startP1[5] = {"Str", "S", "L", "R", "X"};
+const char* P1Green[4] = {"B", "L", "L", "X"};
+const char* P1Red[5] = {"B", "R", "S", "R", "X"};
+const char* greenP2[6] = {"Rot", "S", "S", "R", "R", "X"};
+const char* redP2[7] = {"Rot", "S", "S", "S", "L", "R", "X"};
+const char* P2Green[6] = {"B", "R", "L", "S", "S", "X"};
+const char* P2Red[7] = {"B", "R", "R", "S", "S", "S", "X"};
+const char* greenP3[6] = {"Rot", "S", "S", "S", "R", "X"};
+const char* redP3[5] = {"Rot", "S", "S", "L", "X"};
+const char* P3Green[6] = {"B", "R", "S", "S", "S", "X"};
+const char* P3Red[5] = {"B", "L", "S", "S", "X"};
+const char* greenP4[6] = {"Rot", "S", "R", "S", "R", "X"};
+const char* redP4[5] = {"Rot", "S", "L", "L", "X"};
+const char* redFinish[4] = {"Rot", "L", "L", "X"};
+const char* greenFinish[5] = {"Rot", "R", "S", "R", "X"};
 
 
 //predefine function
@@ -51,9 +51,8 @@ void reverse(int speed=highSpeed, int t=0);
 void turn(int high, int low, bool left);
 void turn_right();
 void turn_left();
-void travellingRound();
-void navDecision();
-void actionTranslate(); 
+void navDecision(const char* route[]);
+void actionTranslate(char action); 
 
 void setup() {
   Serial.begin(9600);           
@@ -71,7 +70,7 @@ void setup() {
 //main
 void loop() {
   //test any function by adding it in
-  travellingRound();
+  navDecision(startP1);
 }
 
 void stop(int t=0) {
@@ -97,7 +96,7 @@ void reverse(int speed=highSpeed, int t=0) {
   delay(t); 
 }
 
-void turn(int high, int low, bool left, int t=0) {
+void turn(int high, int low, bool left) {
   leftMotor->run(forward);
   rightMotor->run(forward);
   if(left){
@@ -107,15 +106,14 @@ void turn(int high, int low, bool left, int t=0) {
     leftMotor->setSpeed(low);
     rightMotor->setSpeed(high);
   }
-  delay(t)
 }
 
 void turn_left() {
-  turn(highSpeed,low_speed,true);
+  turn(highSpeed,lowSpeed,true);
 }
 
 void turn_right() {
-  turn(highSpeed,low_speed,false);
+  turn(highSpeed,lowSpeed,false);
 }
 
 
@@ -171,22 +169,18 @@ void lineFollowingStraight() {
 
 }
 
-void travellingRound() {
-
-}
-
-void navDecision(route) {
+void navDecision(const char* route[]) {
     lineSensorRead();
     int routeSize = sizeof(route) / sizeof(route[0]);
-    for (int i = 0; i < arraySize; ++i) {
+    for (int i = 0; i < routeSize; ++i) {
         actionTranslate(route[i]);
     }
 }
 
-void actionTranslate(action) {
+void actionTranslate(char action) {
   //Str is for travelling straight for a given time, not line following
     if (action == 'Str') {
-      straight(speed=highSpeed, t=2000);
+      straight(highSpeed, 2000);
     }
     //S is for going straight using line following code, but this is only for when you're ignoring a turn to go straight
     if (action == 'S') {
@@ -196,36 +190,36 @@ void actionTranslate(action) {
       }
       if (!lineSensors[0] && lineSensors[0] && lineSensors[0] && !lineSensors[3]){
         // sensor0=0, sensor1=1, sensor2=1, sensor3=0
-        straight(speed=medSpeed, t=2000);
+        straight(medSpeed, 2000);
       }
       if (!lineSensors[0] &&  lineSensors[3]){
         // sensor0=0, sensor3=1
-        stop(t=1000);
+        stop(1000);
       }
       if (lineSensors[0] &&  !lineSensors[3]){
         // sensor0=1, sensor3=0
-        stop(t=1000);
+        stop(1000);
       }
       if (lineSensors[0] && lineSensors[3]){
         // sensor0=1, sensor3=1
-        stop(t=1000);
+        stop(1000);
       }
     }
     //L is for turning left
     if (action == 'L') {
       turn_left();
-      delay(1000)
+      delay(1000);
       if (!lineSensors[0] && lineSensors[1] && lineSensors[2] && !lineSensors[3]){
         // sensor0=0, sensor1=1, sensor2=1, sensor3=0
-        stop(t=1000);
+        stop(1000);
       }
     }
     //R is for turning right
     if (action == 'R') {
-      turn_right(t=1000);
+      turn_right();
       if (!lineSensors[0] && lineSensors[1] && lineSensors[2] && !lineSensors[3]){
         // sensor0=0, sensor1=1, sensor2=1, sensor3=0
-        stop(t=1000);
+        stop(1000);
       }
     }
     //B is for back, so reversing
@@ -234,6 +228,7 @@ void actionTranslate(action) {
       if (lineSensors[0] && lineSensors[1] && lineSensors[2] && lineSensors[3]) {
         stop();
       }
+    }
     //Rot is for a 180 degree rotation, so for leaving the bays exclusively
     if (action == 'Rot') {
       turn_right();
@@ -242,8 +237,6 @@ void actionTranslate(action) {
       }
     }  
     if (action == 'X') {
-      break;
+      stop();
     }
-}
-
-
+  }
