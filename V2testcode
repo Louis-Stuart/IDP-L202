@@ -1,9 +1,12 @@
 #include <Adafruit_MotorShield.h>
 
 
-Adafruit_MotorShield AFMS = Adafruit_MotorShield();
-Adafruit_DCMotor *leftMotor = AFMS.getMotor(1);
+Adafruit_MotorShield AFMS = Adafruit_MotorShield(); // Create the motor shield object with the default I2C address
+Adafruit_DCMotor *leftMotor = AFMS.getMotor(1); //Set up motors
 Adafruit_DCMotor *rightMotor = AFMS.getMotor(2);
+
+//Define the port of each line sensor pin
+
 int leftmostlinesensorPin = 0;
 int leftlinesensorPin = 1;
 int rightlinesensorPin = 2;
@@ -23,7 +26,6 @@ int counter = 0;
 
 
 //predefining navigation arrays
-
 
 const char* startP1[5] = {"Str", "S", "L", "R", "X"};
 const char* P1Green[4] = {"B", "L", "L", "X"};
@@ -54,25 +56,27 @@ void turn_left();
 void navDecision(const char* route[]);
 void actionTranslate(char action); 
 
+
 void setup() {
-  Serial.begin(9600);           
+  Serial.begin(9600); // Set up Serial library at 9600 bps
   if (!AFMS.begin()) {        
     Serial.println("Could not find Motor Shield. Check wiring.");
     while (1);
   }
-  pinMode(leftmostlinesensorPin, INPUT); // declare LED as output
-  pinMode(leftlinesensorPin, INPUT); // declare Micro switch as input
-  pinMode(rightlinesensorPin, INPUT); // declare LED as output
-  pinMode(rightmostlinesensorPin, INPUT); // declare Micro switch as input
+  pinMode(leftmostlinesensorPin, INPUT); // Declare leftmostLED as input
+  pinMode(leftlinesensorPin, INPUT); // Declare leftLED as input
+  pinMode(rightlinesensorPin, INPUT); // Declare rightLED as input
+  pinMode(rightmostlinesensorPin, INPUT); // Declare rightmostLED as input
 }
 
 
 //main
 void loop() {
-  //test any function by adding it in
+  //test function by adding it inside this loop
   lineFollowingStraight();
 }
 
+//Stop function cease the motor
 void stop(int t=0) {
   leftMotor->setSpeed(0);
   rightMotor->setSpeed(0);
@@ -80,6 +84,7 @@ void stop(int t=0) {
   delay(t);
 }
 
+//Straight function tells the motor to go straight regardless
 void straight(int speed=highSpeed, int t=0) {
   leftMotor->run(forward);
   rightMotor->run(forward);
@@ -88,6 +93,7 @@ void straight(int speed=highSpeed, int t=0) {
   delay(t);
 }
 
+//Reverse function tells the motor to run reversely 
 void reverse(int speed=highSpeed, int t=0) {
   leftMotor->run(backward);
   rightMotor->run(backward);
@@ -96,6 +102,7 @@ void reverse(int speed=highSpeed, int t=0) {
   delay(t); 
 }
 
+//Turn function tells the motor to turn, the turning direction is specified by individual turn_left and turn_right functions
 void turn(int high, int low, bool left) {
   leftMotor->run(forward);
   rightMotor->run(forward);
@@ -116,7 +123,7 @@ void turn_right(int high, int low) {
   turn(high,low,false);
 }
 
-
+//It reads the states of four line sensors continuously
 void lineSensorRead(){
   lineSensors[0] = digitalRead(leftmostlinesensorPin);
   lineSensors[1] = digitalRead(leftlinesensorPin);
@@ -124,14 +131,14 @@ void lineSensorRead(){
   lineSensors[3] = digitalRead(rightmostlinesensorPin);
 }
 
-
+//This function includes the functionality of straight line following, turning at single T junctions and double T junctions
 void lineFollowingStraight() {
   lineSensorRead();
   Serial.print(lineSensors[0]);
   Serial.print(lineSensors[1]);
   Serial.print(lineSensors[2]);
   Serial.println(lineSensors[3]);
-  // line sensing based on the two middle sensors always picking up white 
+  // when line sensing based on the two middle sensors picking up white, the bot goes straight 
   if (lineSensors[1] && lineSensors[2]){
     // sensor0=0, sensor1=1, sensor2=1, sensor3=0
     straight();
@@ -158,24 +165,31 @@ void lineFollowingStraight() {
 
   // in case of a single right t junction 
   if (!lineSensors[0] && lineSensors[1] && lineSensors[2] && lineSensors[3]){
+    // sensor0=0, sensor1=1, sensor2=1, sensor3=1
     turn_left(150, lowSpeed);
     delay(1000);
+    //turn left for a moment to let the middle two sensors go off the line 
     while (!lineSensors[1] && !lineSensors[2]) {
+      //the bot will then turn right until the middle two picks the white line again at which time it should goes straight 
       turn_left(150, lowSpeed);
     }
   }
 
   // in case of a single left t junction 
   if (lineSensors[0] && lineSensors[1] && lineSensors[2] && !lineSensors[3]){
+    // sensor0=1, sensor1=1, sensor2=1, sensor3=0
     turn_right(150, lowSpeed);
     delay(1000);
+    //turn right for a moment to let the middle two sensors go off the line
     while (!lineSensors[1] && !lineSensors[2]) {
+      //the bot will then turn left until the middle two picks the white line again at which time it should goes straight
       turn_right(150, lowSpeed);
     }
   }
 
 }
 
+// This two functions takes char arrays of routes as input ,analyzes the meaning of individual element and takes actions
 void navDecision(const char* route[]) {
     lineSensorRead();
     int routeSize = sizeof(route) / sizeof(route[0]);
