@@ -1,0 +1,229 @@
+#include <Adafruit_MotorShield.h>
+
+
+Adafruit_MotorShield AFMS = Adafruit_MotorShield();
+Adafruit_DCMotor *leftMotor = AFMS.getMotor(1);
+Adafruit_DCMotor *rightMotor = AFMS.getMotor(2);
+int leftmostlinesensorPin = 0;
+int leftlinesensorPin = 1;
+int rightlinesensorPin = 2;
+int rightmostlinesensorPin = 3;
+
+
+//define constant
+
+int lineSensors[4];
+bool runOnce = false;
+int lowSpeed = 0;
+int highSpeed = 255;
+int medSpeed = 70;
+char forward = BACKWARD;
+char backward = FORWARD;
+int routeCounter = 0;
+int delivCounter = 0;
+
+
+//predefining navigation arrays
+
+char testRoute[12] = {'A', 'R', 'L', 'S', 'S', 'L', 'S', 'R', 'L', 'L', 'L', 'X'};
+char startP1[5] = {'A', 'L', 'R', 'X'};
+char P1Green[4] = {'B', 'L', 'L', 'X'};
+char P1Red[5] = {'B', 'R', 'S', 'R', 'X'};
+char greenP2[6] = {'Z', 'S', 'S', 'R', 'R', 'X'};
+char redP2[7] = {'Z', 'S', 'S', 'S', 'L', 'R', 'X'};
+char P2Green[6] = {'B', 'R', 'L', 'S', 'S', 'X'};
+char P2Red[7] = {'B', 'R', 'R', 'S', 'S', 'S', 'X'};
+char greenP3[6] = {'Z', 'S', 'S', 'S', 'R', 'X'};
+char redP3[5] = {'Z', 'S', 'S', 'L', 'X'};
+char P3Green[6] = {'B', 'R', 'S', 'S', 'S', 'X'};
+char P3Red[5] = {'B', 'L', 'S', 'S', 'X'};
+char greenP4[6] = {'Z', 'S', 'R', 'S', 'R', 'X'};
+char redP4[5] = {'Z', 'S', 'L', 'L', 'X'};
+char redFinish[4] = {'Z', 'L', 'L', 'X'};
+char greenFinish[5] = {'Z', 'R', 'S', 'R', 'X'};
+
+
+char *action;
+
+//predefine function
+void lineSensorRead();
+void lineFollowing();
+void stop(int t=0);
+void straight(int speed=highSpeed, int t=0);
+void reverse(int speed=highSpeed, int t=0);
+void turn(int high, int low, bool left);
+void turn_right();
+void turn_left();
+void navDecision(const char* route[]);
+void actionTranslate(char action); 
+
+void setup() {
+  Serial.begin(9600);           
+  if (!AFMS.begin()) {        
+    Serial.println("Could not find Motor Shield. Check wiring.");
+    while (1);
+  }
+  pinMode(leftmostlinesensorPin, INPUT); // declare LED as output
+  pinMode(leftlinesensorPin, INPUT); // declare Micro switch as input
+  pinMode(rightlinesensorPin, INPUT); // declare LED as output
+  pinMode(rightmostlinesensorPin, INPUT); // declare Micro switch as input
+
+  action = testRoute; // define the action pointer to point to the address of the first element of the inital array
+}
+
+
+//main
+void loop() {
+  //test any function by adding it in
+  //current action = L
+  navDecision();
+}
+
+void stop(int t=0) {
+  leftMotor->setSpeed(0);
+  rightMotor->setSpeed(0);
+  //might need to run(release)
+  delay(t);
+}
+
+void straight(int speed=highSpeed, int t=0) {
+  leftMotor->run(forward);
+  rightMotor->run(forward);
+  leftMotor->setSpeed(speed);
+  rightMotor->setSpeed(speed);
+  delay(t);
+}
+
+void reverse(int speed=highSpeed, int t=0) {
+  leftMotor->run(backward);
+  rightMotor->run(backward);
+  leftMotor->setSpeed(speed);
+  rightMotor->setSpeed(speed);
+  delay(t); 
+}
+
+void turn(int high, int low, bool left) {
+  leftMotor->run(forward);
+  rightMotor->run(forward);
+  if(left){
+    leftMotor->setSpeed(low);
+    rightMotor->setSpeed(high);
+  }else{
+    leftMotor->setSpeed(high);
+    rightMotor->setSpeed(low);
+  }
+}
+
+void turn_left(int high, int low) {
+  turn(high,low,true);
+}
+
+void turn_right(int high, int low) {
+  turn(high,low,false);
+}
+
+void lineSensorRead(){
+  lineSensors[0] = digitalRead(leftmostlinesensorPin);
+  lineSensors[1] = digitalRead(leftlinesensorPin);
+  lineSensors[2] = digitalRead(rightlinesensorPin);
+  lineSensors[3] = digitalRead(rightmostlinesensorPin);
+}
+
+
+void lineFollowing() {
+  lineSensorRead();
+  Serial.print(lineSensors[0]);
+  Serial.print(lineSensors[1]);
+  Serial.print(lineSensors[2]);
+  Serial.println(lineSensors[3]);
+
+  if (&action == 'A') {
+      straight(highSpeed, 2000);
+      action++;
+  }
+
+  // line sensing based on the two middle sensors always picking up white 
+  if (lineSensors[1] && lineSensors[2] && !lineSensors[0] && !lineSensors[4]){
+    // sensor0=0, sensor1=1, sensor2=1, sensor3=0
+    straight();
+  }
+
+  // correction for staying on the line
+  if (lineSensors[1] && !lineSensors[2] && !lineSensors[0] && !lineSensors[4]) {
+    // sensor0=0, sensor1=1, sensor2=0, sensor3=0
+    turn_left(highSpeed, medSpeed);
+  }
+  
+  // correction for staying on the line
+  if (!lineSensors[1] && lineSensors[2] && !lineSensors[0] && !lineSensors[4]) {
+    // sensor0=0, sensor1=0, sensor2=1, sensor3=0
+    turn_right(highSpeed, medSpeed);
+  }
+
+  // in case of a double t junction
+  if (!lineSensors[1] && !lineSensors[2]) {
+    // this will turn the car left the moment the middle two sensors detect black until they both detect white again
+    while (!lineSensors[1] && !lineSensors[2]) {
+      lineSensorRead();
+      if (&action == 'R') {
+        turn_right(150, lowSpeed); 
+    }
+      if (&action == 'L') {
+        turn_left(150, lowSpeed); 
+      }
+    }
+    action ++;
+  }
+  
+  // in case of a single right t junction 
+  if (!lineSensors[0] && lineSensors[1] && lineSensors[2] && lineSensors[3]){
+    if (&action == 'R') {
+      turn_right(150, lowSpeed);
+      delay(1000);
+      while (!lineSensors[1] && !lineSensors[2]) {
+        lineSensorRead();
+      }
+      action ++;
+    }
+    if (&action == 'S'){
+      action ++;
+      straight(500);
+    }
+  }
+
+  // in case of a single left t junction 
+  if (lineSensors[0] && lineSensors[1] && lineSensors[2] && !lineSensors[3]){
+    if (&action == 'L') {
+      turn_left(150, lowSpeed);
+      delay(1000);
+      while (!lineSensors[1] && !lineSensors[2]) {
+        lineSensorRead();
+      }
+      action ++;
+    }
+    if (&action == 'S'){
+      action++;
+      straight(500);
+    }
+  }
+
+}
+
+void navDecision() {
+    lineSensorRead();
+    lineFollowing();
+    if (&action == 'X'){
+      stop();
+      //decide whether to pick up or put down block
+      //if put down
+        // that
+        //update currentRoute
+        //increment delivCounter
+      //if pick up block
+        //detect colour
+        //update currentRoute
+      // reset routeCounter
+
+      //LED malarkey
+    }
+}
