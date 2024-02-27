@@ -1,0 +1,269 @@
+#include <Adafruit_MotorShield.h>
+
+
+Adafruit_MotorShield AFMS = Adafruit_MotorShield();
+Adafruit_DCMotor *leftMotor = AFMS.getMotor(1);
+Adafruit_DCMotor *rightMotor = AFMS.getMotor(2);
+int leftmostlinesensorPin = 0;
+int leftlinesensorPin = 1;
+int rightlinesensorPin = 2;
+int rightmostlinesensorPin = 3;
+
+
+//define constant
+
+int lineSensors[4];
+bool runOnce = false;
+int lowSpeed = 0;
+int highSpeed = 255;
+int medSpeed = 70;
+char forward = BACKWARD;
+char backward = FORWARD;
+int routeCounter = 0;
+int delivCounter = 0;
+
+
+//predefining navigation arrays
+
+
+char startP1[5] = {"A", "S", "L", "R", "X"}; // A means go straight without line
+const char* P1Green[4] = {"B", "L", "L", "X", "Z", "S", "S", "R", "R", "X"};
+const char* P1Red[5] = {"B", "R", "S", "R", "X", "Z", "S", "S", "S", "L", "R", "X"};
+const char* P2Green[6] = {"B", "R", "L", "S", "S", "X", "Z", "S", "S", "S", "R", "X"};
+const char* P2Red[7] = {"B", "R", "R", "S", "S", "S", "X", "Z", "S", "S", "L", "X"};
+const char* P3Green[6] = {"B", "R", "S", "S", "S", "X", "Z", "S", "R", "S", "R", "X"};
+const char* P3Red[5] = {"B", "L", "S", "S", "X", "Z", "S", "L", "L", "X"};
+const char* P4GreenFinish[] = {};
+const char* P4RedFinish[] = {};
+const char* redFinish[4] = {"Z", "L", "L", "X"};
+const char* greenFinish[5] = {"Z", "R", "S", "R", "X"};
+
+char *currentRoute;
+
+currentRoute = startP1;
+
+//predefine function
+void lineSensorRead();
+void lineFollowingStraight();
+void stop(int t=0);
+void straight(int speed=highSpeed, int t=0);
+void reverse(int speed=highSpeed, int t=0);
+void turn(int high, int low, bool left);
+void turn_right();
+void turn_left();
+void navDecision(const char* route[]);
+void actionTranslate(char action); 
+
+void setup() {
+  Serial.begin(9600);           
+  if (!AFMS.begin()) {        
+    Serial.println("Could not find Motor Shield. Check wiring.");
+    while (1);
+  }
+  pinMode(leftmostlinesensorPin, INPUT); // declare LED as output
+  pinMode(leftlinesensorPin, INPUT); // declare Micro switch as input
+  pinMode(rightlinesensorPin, INPUT); // declare LED as output
+  pinMode(rightmostlinesensorPin, INPUT); // declare Micro switch as input
+}
+
+
+//main
+void loop() {
+  //test any function by adding it in
+  //current action = L
+  lineFollowingStraight();
+}
+
+void stop(int t=0) {
+  leftMotor->setSpeed(0);
+  rightMotor->setSpeed(0);
+  //might need to run(release)
+  delay(t);
+}
+
+void straight(int speed=highSpeed, int t=0) {
+  leftMotor->run(forward);
+  rightMotor->run(forward);
+  leftMotor->setSpeed(speed);
+  rightMotor->setSpeed(speed);
+  delay(t);
+}
+
+void reverse(int speed=highSpeed, int t=0) {
+  leftMotor->run(backward);
+  rightMotor->run(backward);
+  leftMotor->setSpeed(speed);
+  rightMotor->setSpeed(speed);
+  delay(t); 
+}
+
+void turn(int high, int low, bool left) {
+  leftMotor->run(forward);
+  rightMotor->run(forward);
+  if(left){
+    leftMotor->setSpeed(low);
+    rightMotor->setSpeed(high);
+  }else{
+    leftMotor->setSpeed(high);
+    rightMotor->setSpeed(low);
+  }
+}
+
+void turn_left(int high, int low) {
+  turn(high,low,true);
+}
+
+void turn_right(int high, int low) {
+  turn(high,low,false);
+}
+
+void lineSensorRead(){
+  lineSensors[0] = digitalRead(leftmostlinesensorPin);
+  lineSensors[1] = digitalRead(leftlinesensorPin);
+  lineSensors[2] = digitalRead(rightlinesensorPin);
+  lineSensors[3] = digitalRead(rightmostlinesensorPin);
+}
+
+
+void lineFollowingStraight() {
+  lineSensorRead();
+  Serial.print(lineSensors[0]);
+  Serial.print(lineSensors[1]);
+  Serial.print(lineSensors[2]);
+  Serial.println(lineSensors[3]);
+
+  // line sensing based on the two middle sensors always picking up white 
+  if (lineSensors[1] && lineSensors[2]){
+    // sensor0=0, sensor1=1, sensor2=1, sensor3=0
+    straight();
+  }
+
+  // correction for staying on the line
+  if (lineSensors[1] && !lineSensors[2]) {
+    // sensor0=0, sensor1=1, sensor2=0, sensor3=0
+    turn_left(highSpeed, medSpeed);
+  }
+  
+  // correction for staying on the line
+  if (!lineSensors[1] && lineSensors[2]) {
+    // sensor0=0, sensor1=0, sensor2=1, sensor3=0
+    turn_right(highSpeed, medSpeed);
+  }
+
+  // in case of a double t junction
+  if (!lineSensors[1] && !lineSensors[2]) {
+    // this will turn the car left the moment the middle two sensors detect black until they both detect white again
+    while (!lineSensors[1] && !lineSensors[2]) {
+      if (action == 'R') {
+        turn_right(150, lowSpeed); 
+    }
+      if (action == 'L') {
+        turn_left(150, lowSpeed); 
+      }
+  } 
+  
+
+  // in case of a single right t junction 
+  if (!lineSensors[0] && lineSensors[1] && lineSensors[2] && lineSensors[3]){
+    if (action == 'R') {
+      turn_right(150, lowSpeed);
+      delay(1000);
+      while (!lineSensors[1] && !lineSensors[2]) {
+        turn_right(150, lowSpeed);
+      }
+      routeCounter ++;
+    }
+  }
+
+  // in case of a single left t junction 
+  if (lineSensors[0] && lineSensors[1] && lineSensors[2] && !lineSensors[3]){
+    if (action == 'L') {
+      turn_left(150, lowSpeed);
+      delay(1000);
+      while (!lineSensors[1] && !lineSensors[2]) {
+        turn_left(150, lowSpeed);
+      }
+      routeCounter ++;
+    }
+  }
+
+}
+
+void navDecision() {
+    lineSensorRead();
+    action = route[routeCounter];
+    actionTranslate(action);
+    if routeCounter exceeds length of current Route, choose new route, if not at finish
+    get colour of block
+    update current route
+    reset routeCounter
+    increment delivCounter
+}
+
+void actionTranslate(char action) {
+  //Str is for travelling straight for a given time, not line following
+    if (action == 'Str') {
+      straight(highSpeed, 2000);
+      routeCounter++;
+    }
+    //S is for going straight using line following code, but this is only for when you're ignoring a turn to go straight
+    if (action == 'S') {
+      if (!lineSensors[0] && lineSensors[1] && lineSensors[2] && !lineSensors[3]){
+        // sensor0=0, sensor1=1, sensor2=1, sensor3=0
+        straight();
+      }
+      if (!lineSensors[0] && lineSensors[0] && lineSensors[0] && !lineSensors[3]){
+        // sensor0=0, sensor1=1, sensor2=1, sensor3=0
+        straight(medSpeed, 2000);
+      }
+      if (!lineSensors[0] &&  lineSensors[3]){
+        // sensor0=0, sensor3=1
+        stop(1000);
+      }
+      if (lineSensors[0] &&  !lineSensors[3]){
+        // sensor0=1, sensor3=0
+        stop(1000);
+      }
+      if (lineSensors[0] && lineSensors[3]){
+        // sensor0=1, sensor3=1
+        stop(1000);
+      }
+    }
+    //L is for turning left
+    if (action == 'L') {
+      if (lineSensors[0] && lineSensors[1] && lineSensors[2] && !lineSensors[3]){
+        turn_left(150, lowSpeed);
+        delay(1000);
+        while (!lineSensors[1] && !lineSensors[2]) {
+          turn_left(150, lowSpeed);
+      
+    }
+  }
+      }
+    }
+    //R is for turning right
+    if (action == 'R') {
+      turn_left();
+      if (!lineSensors[0] && lineSensors[1] && lineSensors[2] && !lineSensors[3]){
+        // sensor0=0, sensor1=1, sensor2=1, sensor3=0
+        stop(1000);
+      }
+    }
+    //B is for back, so reversing
+    if (action == 'B') {
+      reverse();
+      if (lineSensors[0] && lineSensors[1] && lineSensors[2] && lineSensors[3]) {
+        stop();
+      }
+    }
+    //Rot is for a 180 degree rotation, so for leaving the bays exclusively
+    if (action == 'Rot') {
+      turn_left();
+      if (!lineSensors[0] && lineSensors[1] && lineSensors[2] && !lineSensors[3]) {
+        stop();
+      }
+    }  
+    if (action == 'X') {
+      stop(2000);
+    }
+  }
