@@ -25,26 +25,30 @@ int delivCounter = 0;
 
 //predefining navigation arrays
 
-
-char startP1[5] = {"A", "S", "L", "R", "X"}; // A means go straight without line
-const char* P1Green[4] = {"B", "L", "L", "X", "Z", "S", "S", "R", "R", "X"};
-const char* P1Red[5] = {"B", "R", "S", "R", "X", "Z", "S", "S", "S", "L", "R", "X"};
-const char* P2Green[6] = {"B", "R", "L", "S", "S", "X", "Z", "S", "S", "S", "R", "X"};
-const char* P2Red[7] = {"B", "R", "R", "S", "S", "S", "X", "Z", "S", "S", "L", "X"};
-const char* P3Green[6] = {"B", "R", "S", "S", "S", "X", "Z", "S", "R", "S", "R", "X"};
-const char* P3Red[5] = {"B", "L", "S", "S", "X", "Z", "S", "L", "L", "X"};
-const char* P4GreenFinish[] = {};
-const char* P4RedFinish[] = {};
+const char* testRoute[12] = {"A", "R", "L", "S", "S", "L", "S", "R", "L", "L", "L", "X"};
+const char* startP1[5] = {"A", "L", "R", "X"};
+const char* P1Green[4] = {"B", "L", "L", "X"};
+const char* P1Red[5] = {"B", "R", "S", "R", "X"};
+const char* greenP2[6] = {"Z", "S", "S", "R", "R", "X"};
+const char* redP2[7] = {"Z", "S", "S", "S", "L", "R", "X"};
+const char* P2Green[6] = {"B", "R", "L", "S", "S", "X"};
+const char* P2Red[7] = {"B", "R", "R", "S", "S", "S", "X"};
+const char* greenP3[6] = {"Z", "S", "S", "S", "R", "X"};
+const char* redP3[5] = {"Z", "S", "S", "L", "X"};
+const char* P3Green[6] = {"B", "R", "S", "S", "S", "X"};
+const char* P3Red[5] = {"B", "L", "S", "S", "X"};
+const char* greenP4[6] = {"Z", "S", "R", "S", "R", "X"};
+const char* redP4[5] = {"Z", "S", "L", "L", "X"};
 const char* redFinish[4] = {"Z", "L", "L", "X"};
 const char* greenFinish[5] = {"Z", "R", "S", "R", "X"};
 
 char *currentRoute;
 
-currentRoute = startP1;
+currentRoute = testRoute;
 
 //predefine function
 void lineSensorRead();
-void lineFollowingStraight();
+void lineFollowing();
 void stop(int t=0);
 void straight(int speed=highSpeed, int t=0);
 void reverse(int speed=highSpeed, int t=0);
@@ -71,7 +75,7 @@ void setup() {
 void loop() {
   //test any function by adding it in
   //current action = L
-  lineFollowingStraight();
+  navDecision();
 }
 
 void stop(int t=0) {
@@ -125,27 +129,32 @@ void lineSensorRead(){
 }
 
 
-void lineFollowingStraight() {
+void lineFollowing(char action) {
   lineSensorRead();
   Serial.print(lineSensors[0]);
   Serial.print(lineSensors[1]);
   Serial.print(lineSensors[2]);
   Serial.println(lineSensors[3]);
 
+  if (action == "A") {
+      straight(highSpeed, 2000);
+      routeCounter ++;
+  }
+
   // line sensing based on the two middle sensors always picking up white 
-  if (lineSensors[1] && lineSensors[2]){
+  if (lineSensors[1] && lineSensors[2] && !lineSensors[0] && !lineSensors[4]){
     // sensor0=0, sensor1=1, sensor2=1, sensor3=0
     straight();
   }
 
   // correction for staying on the line
-  if (lineSensors[1] && !lineSensors[2]) {
+  if (lineSensors[1] && !lineSensors[2] && !lineSensors[0] && !lineSensors[4]) {
     // sensor0=0, sensor1=1, sensor2=0, sensor3=0
     turn_left(highSpeed, medSpeed);
   }
   
   // correction for staying on the line
-  if (!lineSensors[1] && lineSensors[2]) {
+  if (!lineSensors[1] && lineSensors[2] && !lineSensors[0] && !lineSensors[4]) {
     // sensor0=0, sensor1=0, sensor2=1, sensor3=0
     turn_right(highSpeed, medSpeed);
   }
@@ -154,36 +163,46 @@ void lineFollowingStraight() {
   if (!lineSensors[1] && !lineSensors[2]) {
     // this will turn the car left the moment the middle two sensors detect black until they both detect white again
     while (!lineSensors[1] && !lineSensors[2]) {
+      lineSensorRead()
       if (action == 'R') {
         turn_right(150, lowSpeed); 
     }
       if (action == 'L') {
         turn_left(150, lowSpeed); 
       }
-  } 
+    }
+    routeCounter ++;
+  }
   
-
   // in case of a single right t junction 
   if (!lineSensors[0] && lineSensors[1] && lineSensors[2] && lineSensors[3]){
-    if (action == 'R') {
+    if (action == "R") {
       turn_right(150, lowSpeed);
       delay(1000);
       while (!lineSensors[1] && !lineSensors[2]) {
-        turn_right(150, lowSpeed);
+        lineSensorRead();
       }
       routeCounter ++;
+    }
+    if (action == "S"){
+      routeCounter ++;
+      straight(500);
     }
   }
 
   // in case of a single left t junction 
   if (lineSensors[0] && lineSensors[1] && lineSensors[2] && !lineSensors[3]){
-    if (action == 'L') {
+    if (action == "L") {
       turn_left(150, lowSpeed);
       delay(1000);
       while (!lineSensors[1] && !lineSensors[2]) {
-        turn_left(150, lowSpeed);
+        lineSensorRead();
       }
       routeCounter ++;
+    }
+    if (action == "S"){
+      routeCounter ++;
+      straight(500);
     }
   }
 
@@ -191,79 +210,21 @@ void lineFollowingStraight() {
 
 void navDecision() {
     lineSensorRead();
-    action = route[routeCounter];
-    actionTranslate(action);
-    if routeCounter exceeds length of current Route, choose new route, if not at finish
-    get colour of block
-    update current route
-    reset routeCounter
-    increment delivCounter
-}
+    char action = route[routeCounter];
+    lineFollowing(action);
+    int routeLen = currentRoute.size();
+    if (action == "X"){
+      stop();
+      //decide whether to pick up or put down block
+      //if put down
+        // that
+        //update currentRoute
+        //increment delivCounter
+      //if pick up block
+        //detect colour
+        //update currentRoute
+      // reset routeCounter
 
-void actionTranslate(char action) {
-  //Str is for travelling straight for a given time, not line following
-    if (action == 'Str') {
-      straight(highSpeed, 2000);
-      routeCounter++;
+      //LED malarkey
     }
-    //S is for going straight using line following code, but this is only for when you're ignoring a turn to go straight
-    if (action == 'S') {
-      if (!lineSensors[0] && lineSensors[1] && lineSensors[2] && !lineSensors[3]){
-        // sensor0=0, sensor1=1, sensor2=1, sensor3=0
-        straight();
-      }
-      if (!lineSensors[0] && lineSensors[0] && lineSensors[0] && !lineSensors[3]){
-        // sensor0=0, sensor1=1, sensor2=1, sensor3=0
-        straight(medSpeed, 2000);
-      }
-      if (!lineSensors[0] &&  lineSensors[3]){
-        // sensor0=0, sensor3=1
-        stop(1000);
-      }
-      if (lineSensors[0] &&  !lineSensors[3]){
-        // sensor0=1, sensor3=0
-        stop(1000);
-      }
-      if (lineSensors[0] && lineSensors[3]){
-        // sensor0=1, sensor3=1
-        stop(1000);
-      }
-    }
-    //L is for turning left
-    if (action == 'L') {
-      if (lineSensors[0] && lineSensors[1] && lineSensors[2] && !lineSensors[3]){
-        turn_left(150, lowSpeed);
-        delay(1000);
-        while (!lineSensors[1] && !lineSensors[2]) {
-          turn_left(150, lowSpeed);
-      
-    }
-  }
-      }
-    }
-    //R is for turning right
-    if (action == 'R') {
-      turn_left();
-      if (!lineSensors[0] && lineSensors[1] && lineSensors[2] && !lineSensors[3]){
-        // sensor0=0, sensor1=1, sensor2=1, sensor3=0
-        stop(1000);
-      }
-    }
-    //B is for back, so reversing
-    if (action == 'B') {
-      reverse();
-      if (lineSensors[0] && lineSensors[1] && lineSensors[2] && lineSensors[3]) {
-        stop();
-      }
-    }
-    //Rot is for a 180 degree rotation, so for leaving the bays exclusively
-    if (action == 'Rot') {
-      turn_left();
-      if (!lineSensors[0] && lineSensors[1] && lineSensors[2] && !lineSensors[3]) {
-        stop();
-      }
-    }  
-    if (action == 'X') {
-      stop(2000);
-    }
-  }
+}
