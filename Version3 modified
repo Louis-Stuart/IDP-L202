@@ -25,7 +25,7 @@ int delivCounter = 0;
 
 //predefining navigation arrays
 
-char testRoute[12] = {'A', 'R', 'L', 'S', 'S', 'L', 'S', 'R', 'L', 'L', 'L', 'X'};
+char testRoute[12] = {'L', 'S', 'S', 'L', 'S', 'R', 'L', 'L', 'L', 'X'};
 char startP1[5] = {'A', 'L', 'R', 'X'};
 char P1Green[4] = {'B', 'L', 'L', 'X'};
 char P1Red[5] = {'B', 'R', 'S', 'R', 'X'};
@@ -39,6 +39,8 @@ char P3Green[6] = {'B', 'R', 'S', 'S', 'S', 'X'};
 char P3Red[5] = {'B', 'L', 'S', 'S', 'X'};
 char greenP4[6] = {'Z', 'S', 'R', 'S', 'R', 'X'};
 char redP4[5] = {'Z', 'S', 'L', 'L', 'X'};
+char P4green[] = {'B', 'R', 'S', 'L', 'S', 'X'} ;
+char P4red[] = {'B', 'L', 'R', 'S', 'X'};
 char redFinish[4] = {'Z', 'L', 'L', 'X'};
 char greenFinish[5] = {'Z', 'R', 'S', 'R', 'X'};
 
@@ -135,28 +137,32 @@ void lineFollowing() {
   Serial.print(lineSensors[0]);
   Serial.print(lineSensors[1]);
   Serial.print(lineSensors[2]);
-  Serial.println(lineSensors[3]);
+  Serial.print(lineSensors[3]);
+  Serial.println(action[0]);
 
-  if (&action == 'A') {
-      straight(highSpeed, 2000);
+  if (action[0] == 'A') {
+      straight(highSpeed, 1000);
       action++;
   }
 
   // line sensing based on the two middle sensors always picking up white 
-  if (lineSensors[1] && lineSensors[2] && !lineSensors[0] && !lineSensors[4]){
+  if (lineSensors[1] && lineSensors[2] && !lineSensors[0] && !lineSensors[3]){
     // sensor0=0, sensor1=1, sensor2=1, sensor3=0
+    Serial.println("straight");
     straight();
   }
 
   // correction for staying on the line
-  if (lineSensors[1] && !lineSensors[2] && !lineSensors[0] && !lineSensors[4]) {
+  if (lineSensors[1] && !lineSensors[2] && !lineSensors[0] && !lineSensors[3]) {
     // sensor0=0, sensor1=1, sensor2=0, sensor3=0
+    Serial.println("correct left");
     turn_left(highSpeed, medSpeed);
   }
   
   // correction for staying on the line
-  if (!lineSensors[1] && lineSensors[2] && !lineSensors[0] && !lineSensors[4]) {
+  if (!lineSensors[1] && lineSensors[2] && !lineSensors[0] && !lineSensors[3]) {
     // sensor0=0, sensor1=0, sensor2=1, sensor3=0
+    Serial.println("correct right");
     turn_right(highSpeed, medSpeed);
   }
 
@@ -165,10 +171,11 @@ void lineFollowing() {
     // this will turn the car left the moment the middle two sensors detect black until they both detect white again
     while (!lineSensors[1] && !lineSensors[2]) {
       lineSensorRead();
-      if (&action == 'R') {
+      Serial.println("double t junction");
+      if (action[0] == 'R') {
         turn_right(150, lowSpeed); 
     }
-      if (&action == 'L') {
+      if (action[0] == 'L') {
         turn_left(150, lowSpeed); 
       }
     }
@@ -177,7 +184,8 @@ void lineFollowing() {
   
   // in case of a single right t junction 
   if (!lineSensors[0] && lineSensors[1] && lineSensors[2] && lineSensors[3]){
-    if (&action == 'R') {
+    Serial.println("t right junction");
+    if (action[0] == 'R') {
       turn_right(150, lowSpeed);
       delay(1000);
       while (!lineSensors[1] && !lineSensors[2]) {
@@ -185,7 +193,7 @@ void lineFollowing() {
       }
       action ++;
     }
-    if (&action == 'S'){
+    if (action[0] == 'S'){
       action ++;
       straight(500);
     }
@@ -193,7 +201,8 @@ void lineFollowing() {
 
   // in case of a single left t junction 
   if (lineSensors[0] && lineSensors[1] && lineSensors[2] && !lineSensors[3]){
-    if (&action == 'L') {
+    Serial.println("t left junction");
+    if (action[0] == 'L') {
       turn_left(150, lowSpeed);
       delay(1000);
       while (!lineSensors[1] && !lineSensors[2]) {
@@ -201,7 +210,7 @@ void lineFollowing() {
       }
       action ++;
     }
-    if (&action == 'S'){
+    if (action[0] == 'S'){
       action++;
       straight(500);
     }
