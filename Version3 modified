@@ -8,15 +8,19 @@ int leftmostlinesensorPin = 0;
 int leftlinesensorPin = 1;
 int rightlinesensorPin = 2;
 int rightmostlinesensorPin = 3;
+int redLEDPin = 9;
+int greenLEDPin = 10;
+int blueLEDPin =  11;
+int buttonPin = 12; // Connect button to input pin 12
+
 
 
 //define constant
 
 int lineSensors[4];
-bool runOnce = false;
 int lowSpeed = 0;
 int highSpeed = 255;
-int medSpeed = 70;
+int medSpeed = 90;
 char forward = BACKWARD;
 char backward = FORWARD;
 int routeCounter = 0;
@@ -25,7 +29,7 @@ int delivCounter = 0;
 
 //predefining navigation arrays
 
-char testRoute[12] = {'L', 'S', 'S', 'L', 'S', 'R', 'L', 'L', 'L', 'X'};
+char testRoute[12] = {'A','R', 'L', 'S', 'S', 'L', 'S', 'R', 'L', 'L', 'L', 'X'};
 char startP1[5] = {'A', 'L', 'R', 'X'};
 char P1Green[4] = {'B', 'L', 'L', 'X'};
 char P1Red[5] = {'B', 'R', 'S', 'R', 'X'};
@@ -69,6 +73,7 @@ void setup() {
   pinMode(leftlinesensorPin, INPUT); // declare Micro switch as input
   pinMode(rightlinesensorPin, INPUT); // declare LED as output
   pinMode(rightmostlinesensorPin, INPUT); // declare Micro switch as input
+  pinMode(buttonPin, INPUT); // declare pushbutton as input
 
   action = testRoute; // define the action pointer to point to the address of the first element of the inital array
 }
@@ -78,9 +83,17 @@ void setup() {
 void loop() {
   //test any function by adding it in
   //current action = L
+  //if (digitalRead(buttonPin) == LOW) {
   navDecision();
+  /*}
+  else{
+    action = testRoute; // define the action pointer to point to the address of the first element of the inital array
+    routeCounter = 0;
+    delivCounter = 0;
+    stop(2000);
+  }
+*/
 }
-
 void stop(int t=0) {
   leftMotor->setSpeed(0);
   rightMotor->setSpeed(0);
@@ -141,7 +154,7 @@ void lineFollowing() {
   Serial.println(action[0]);
 
   if (action[0] == 'A') {
-      straight(highSpeed, 1000);
+      straight(highSpeed, 2000);
       action++;
   }
 
@@ -195,7 +208,7 @@ void lineFollowing() {
     }
     if (action[0] == 'S'){
       action ++;
-      straight(500);
+      straight(1000);
     }
   }
 
@@ -221,7 +234,7 @@ void lineFollowing() {
 void navDecision() {
     lineSensorRead();
     lineFollowing();
-    if (&action == 'X'){
+    if (action[0] == 'X'){
       stop();
       //decide whether to pick up or put down block
       //if put down
