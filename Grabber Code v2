@@ -1,0 +1,76 @@
+#include <Servo.h>
+
+Servo liftServo; // create servo object to control a servo
+Servo clawServo;
+
+int posClaw = 0;
+int posLift = 100; // variable to store the servo position
+
+void setup() {
+  Serial.begin(9600);
+ liftServo.attach(7); // attaches the servo on pin 9 to the servo object
+ clawServo.attach(8); // attaches the servo on pin 9 to the servo object
+}
+
+// defining variables
+bool block = false;
+
+// defining functions
+void liftBlock();
+void lowerBlock();
+void grabBlock();
+void releaseBlock();
+
+
+void loop() {
+  if (!block) {
+    lowerBlock();
+    delay(500);
+    grabBlock();
+    delay(500);
+    liftBlock();
+    block = true;
+  }
+  if (block) {
+    lowerBlock();
+    delay(500);
+    releaseBlock();
+    delay(500);
+    liftBlock();
+    block = false;
+}
+ }
+
+
+void liftBlock(){
+  for (posLift = 100; posLift >= 0; posLift -= 1) { 
+  // goes from 180 degrees to 0 degrees
+    liftServo.write(posLift); // tell servo to go to position in variable 'pos'
+    delay(50); // waits 15 ms for the servo to reach the position
+  }
+}
+
+void releaseBlock() {
+    for (posClaw = 70; posClaw >= 0; posClaw -= 1) { 
+      // goes from 180 degrees to 0 degrees
+      clawServo.write(posClaw); // tell servo to go to position in variable 'pos'
+      delay(50); // waits 15 ms for the servo to reach the position
+    }
+}
+
+void grabBlock() {
+    for (posClaw = 0; posClaw <= 70; posClaw += 1) { // goes from 0 degrees to 180 degrees in steps of 1 degree
+        clawServo.write(posClaw); // tell servo to go to position in variable 'pos'
+        delay(50); // waits 15 ms for the servo to reach the position
+      }
+}
+
+void lowerBlock() {
+  for (posLift = 0; posLift <= 100; posLift += 1) { // goes from 0 degrees to 180 degrees in steps of 1 degree
+    liftServo.write(posLift); // tell servo to go to position in variable 'pos'
+    delay(50); // waits 15 ms for the servo to reach the position
+  }
+}
+
+
+
