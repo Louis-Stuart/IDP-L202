@@ -1,0 +1,72 @@
+#include <Servo.h>
+
+Servo liftServo;
+Servo gripperServo;
+
+bool block = false;
+
+// TODO: Adjust angle
+int posGripperOpen = 0;
+int posGripperClose = 0; 
+int posLiftUp = 0;
+int posLiftDown = 0;
+int posCurrentGripper = 0;
+int posCurrentLift = 0;
+
+void setup() {
+  liftServo.attach(7);
+  gripperServo.attach(8);
+  liftServo.write(posLiftUp);
+  posCurrentLift = posLiftUp;
+  gripperServo.write(posGripperClose);
+  posCurrentGripper = posGripperClose;
+}
+
+void loop() {
+  delay(500);
+  if (!block) {
+    closeGripper();
+    delay(500);
+    lowerGripper();
+    delay(500);
+    openGripper();
+    delay(500);
+    closeGripper();
+    delay(500);
+    liftGripper();
+    block = true;
+    delay(2000);
+    block = false;
+  }
+}
+
+void liftGripper() {
+  posCurrentLift = rampedServoMove(liftServo, posCurrentLift, posLiftUp, 1);
+}
+
+void lowerGripper() {
+  posCurrentLift = rampedServoMove(liftServo, posCurrentLift, posLiftDown, 1);
+}
+
+void openGripper() {
+  posCurrentGripper = rampedServoMove(gripperServo, posCurrentGripper, posGripperOpen, 1);
+}
+
+void closeGripper() {
+  posCurrentGripper = rampedServoMove(gripperServo, posCurrentGripper, posGripperClose, 1);
+}
+
+int rampedServoMove(Servo &servoLocal, int currentDegree, int desiredDegree, int increment, int timeDelay = 50) {
+  if (currentDegree < desiredDegree) {
+    for (; currentDegree <= desiredDegree; currentDegree += increment) {
+      servoLocal.write(currentDegree);
+      delay(timeDelay);
+    }
+  } else {
+    for (; currentDegree >= desiredDegree; currentDegree -= increment) {
+      servoLocal.write(currentDegree);
+      delay(timeDelay);
+    }
+  }
+  return desiredDegree;
+}
