@@ -5,11 +5,13 @@ Servo clawServo;
 
 int posClaw = 0;
 int posLift = 100; // variable to store the servo position
-
+int intiPosLift, intiPosClaw;
 void setup() {
   Serial.begin(9600);
  liftServo.attach(7); // attaches the servo on pin 9 to the servo object
  clawServo.attach(8); // attaches the servo on pin 9 to the servo object
+ intiPosLift = liftServo.read();
+ intiPosClaw = clawServo.read();
 }
 
 // defining variables
@@ -43,7 +45,7 @@ void loop() {
 
 
 void liftBlock(){
-  for (posLift = 100; posLift >= 0; posLift -= 1) { 
+  for (posLift = 100; posLift >= intiPosLift; posLift -= 1) { 
   // goes from 180 degrees to 0 degrees
     liftServo.write(posLift); // tell servo to go to position in variable 'pos'
     delay(50); // waits 15 ms for the servo to reach the position
@@ -51,7 +53,7 @@ void liftBlock(){
 }
 
 void releaseBlock() {
-    for (posClaw = 70; posClaw >= 0; posClaw -= 1) { 
+    for (posClaw = 70; posClaw >= intiPosClaw; posClaw -= 1) { 
       // goes from 180 degrees to 0 degrees
       clawServo.write(posClaw); // tell servo to go to position in variable 'pos'
       delay(50); // waits 15 ms for the servo to reach the position
@@ -59,14 +61,14 @@ void releaseBlock() {
 }
 
 void grabBlock() {
-    for (posClaw = 0; posClaw <= 70; posClaw += 1) { // goes from 0 degrees to 180 degrees in steps of 1 degree
+    for (posClaw = intiPosClaw; posClaw <= 70; posClaw += 1) { // goes from 0 degrees to 180 degrees in steps of 1 degree
         clawServo.write(posClaw); // tell servo to go to position in variable 'pos'
         delay(50); // waits 15 ms for the servo to reach the position
       }
 }
 
 void lowerBlock() {
-  for (posLift = 0; posLift <= 100; posLift += 1) { // goes from 0 degrees to 180 degrees in steps of 1 degree
+  for (posLift = intiPosLift; posLift <= 100; posLift += 1) { // goes from 0 degrees to 180 degrees in steps of 1 degree
     liftServo.write(posLift); // tell servo to go to position in variable 'pos'
     delay(50); // waits 15 ms for the servo to reach the position
   }
