@@ -4,19 +4,23 @@
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 Adafruit_DCMotor *leftMotor = AFMS.getMotor(1);
 Adafruit_DCMotor *rightMotor = AFMS.getMotor(2);
-int leftmostlinesensorPin = 0;
-int leftlinesensorPin = 1;
-int rightlinesensorPin = 2;
-int rightmostlinesensorPin = 3;
+int leftmostlinesensorPin = 1;
+int leftlinesensorPin = 2;
+int rightlinesensorPin = 3;
+int rightmostlinesensorPin = 4;
+int redLEDPin = 9;
+int greenLEDPin = 10;
+int blueLEDPin =  11;
+int buttonPin = 12; // Connect button to input pin 12
+
 
 
 //define constant
 
 int lineSensors[4];
-bool runOnce = false;
 int lowSpeed = 0;
-int highSpeed = 255;
-int medSpeed = 70;
+int highSpeed = 180;
+int medSpeed = 90;
 char forward = BACKWARD;
 char backward = FORWARD;
 int routeCounter = 0;
@@ -25,26 +29,27 @@ int delivCounter = 0;
 
 //predefining navigation arrays
 
-const char* testRoute[12] = {"A", "R", "L", "S", "S", "L", "S", "R", "L", "L", "L", "X"};
-const char* startP1[5] = {"A", "L", "R", "X"};
-const char* P1Green[4] = {"B", "L", "L", "X"};
-const char* P1Red[5] = {"B", "R", "S", "R", "X"};
-const char* greenP2[6] = {"Z", "S", "S", "R", "R", "X"};
-const char* redP2[7] = {"Z", "S", "S", "S", "L", "R", "X"};
-const char* P2Green[6] = {"B", "R", "L", "S", "S", "X"};
-const char* P2Red[7] = {"B", "R", "R", "S", "S", "S", "X"};
-const char* greenP3[6] = {"Z", "S", "S", "S", "R", "X"};
-const char* redP3[5] = {"Z", "S", "S", "L", "X"};
-const char* P3Green[6] = {"B", "R", "S", "S", "S", "X"};
-const char* P3Red[5] = {"B", "L", "S", "S", "X"};
-const char* greenP4[6] = {"Z", "S", "R", "S", "R", "X"};
-const char* redP4[5] = {"Z", "S", "L", "L", "X"};
-const char* redFinish[4] = {"Z", "L", "L", "X"};
-const char* greenFinish[5] = {"Z", "R", "S", "R", "X"};
+char testRoute[] = {'R', 'L', 'S', 'S' };
+char startP1[5] = {'L', 'R', 'X'};
+char P1Green[4] = {'L', 'L', 'X'};
+char P1Red[5] = {'B', 'R', 'S', 'R', 'X'};
+char greenP2[6] = {'Z', 'S', 'S', 'R', 'R', 'X'};
+char redP2[7] = {'Z', 'S', 'S', 'S', 'L', 'R', 'X'};
+char P2Green[6] = {'B', 'R', 'L', 'S', 'S', 'X'};
+char P2Red[7] = {'B', 'R', 'R', 'S', 'S', 'S', 'X'};
+char greenP3[6] = {'Z', 'S', 'S', 'S', 'R', 'X'};
+char redP3[5] = {'Z', 'S', 'S', 'L', 'X'};
+char P3Green[6] = {'B', 'R', 'S', 'S', 'S', 'X'};
+char P3Red[5] = {'B', 'L', 'S', 'S', 'X'};
+char greenP4[6] = {'Z', 'S', 'R', 'S', 'R', 'X'};
+char redP4[5] = {'Z', 'S', 'L', 'L', 'X'};
+char P4green[] = {'B', 'R', 'S', 'L', 'S', 'X'} ;
+char P4red[] = {'B', 'L', 'R', 'S', 'X'};
+char redFinish[4] = {'Z', 'L', 'L', 'X'};
+char greenFinish[5] = {'Z', 'R', 'S', 'R', 'X'};
 
-char *currentRoute;
 
-currentRoute = testRoute;
+char *action;
 
 //predefine function
 void lineSensorRead();
@@ -55,7 +60,7 @@ void reverse(int speed=highSpeed, int t=0);
 void turn(int high, int low, bool left);
 void turn_right();
 void turn_left();
-void navDecision(const char* route[]);
+void navDecision();
 void actionTranslate(char action); 
 
 void setup() {
@@ -68,14 +73,60 @@ void setup() {
   pinMode(leftlinesensorPin, INPUT); // declare Micro switch as input
   pinMode(rightlinesensorPin, INPUT); // declare LED as output
   pinMode(rightmostlinesensorPin, INPUT); // declare Micro switch as input
+  pinMode(buttonPin, INPUT); // declare pushbutton as input
+
+  action = startP1; // define the action pointer to point to the address of the first element of the inital array
 }
 
 
 //main
 void loop() {
+  if (routeCounter == 0) {
+    straight(highSpeed, 1500);
+    routeCounter ++;
+  }
   //test any function by adding it in
   //current action = L
-  navDecision();
+  //if (digitalRead(buttonPin) == LOW) {
+  if (routeCounter == 1) {
+    if (action[0] == 'X'){
+      /*
+      ultrasoundValue = ultrasound.read()
+      while (ultrasoundValue > 4) {
+        straight();
+        ultrasound read
+      
+    }*/
+      stop();
+      delay(1000);
+      routeCounter++;
+    }
+    else{
+      navDecision();
+    }
+  }
+  
+
+  /*}
+  else{
+    action = testRoute; // define the action pointer to point to the address of the first element of the inital array
+    routeCounter = 0;
+    delivCounter = 0;
+    stop(2000);
+  }
+*/
+  
+    if (routeCounter == 2) {
+      lineSensorRead();
+      if (!lineSensors[0] && !lineSensors[3]) {
+        reverse(150);
+      }
+      else {
+        stop();
+        action = P1Green;
+        routeCounter = 1;
+    }
+  }
 }
 
 void stop(int t=0) {
@@ -93,7 +144,7 @@ void straight(int speed=highSpeed, int t=0) {
   delay(t);
 }
 
-void reverse(int speed=highSpeed, int t=0) {
+void reverse(int speed, int t) {
   leftMotor->run(backward);
   rightMotor->run(backward);
   leftMotor->setSpeed(speed);
@@ -101,24 +152,43 @@ void reverse(int speed=highSpeed, int t=0) {
   delay(t); 
 }
 
-void turn(int high, int low, bool left) {
-  leftMotor->run(forward);
-  rightMotor->run(forward);
+void turn(int high, int low, bool left, bool rev) {
   if(left){
-    leftMotor->setSpeed(low);
-    rightMotor->setSpeed(high);
-  }else{
-    leftMotor->setSpeed(high);
-    rightMotor->setSpeed(low);
+    if (rev) {
+      leftMotor->run(backward);
+      rightMotor->run(forward);
+      leftMotor->setSpeed(low);
+      rightMotor->setSpeed(high);
+    }
+    if (!rev) {
+      leftMotor->run(forward);
+      rightMotor->run(forward);
+      leftMotor->setSpeed(low);
+      rightMotor->setSpeed(high);
+    }
+  }
+  else{
+    if (rev) {
+      leftMotor->run(forward);
+      rightMotor->run(backward);
+      leftMotor->setSpeed(high);
+      rightMotor->setSpeed(low);
+    }
+    if (!rev) {
+      leftMotor->run(forward);
+      rightMotor->run(forward);
+      leftMotor->setSpeed(high);
+      rightMotor->setSpeed(low);
+    }
   }
 }
 
-void turn_left(int high, int low) {
-  turn(high,low,true);
+void turn_left(int high, int low, bool rev) {
+  turn(high,low,true, rev);
 }
 
-void turn_right(int high, int low) {
-  turn(high,low,false);
+void turn_right(int high, int low, bool rev) {
+  turn(high,low,false, rev);
 }
 
 void lineSensorRead(){
@@ -129,92 +199,121 @@ void lineSensorRead(){
 }
 
 
-void lineFollowing(char action) {
+void lineFollowing() {
   lineSensorRead();
   Serial.print(lineSensors[0]);
   Serial.print(lineSensors[1]);
   Serial.print(lineSensors[2]);
-  Serial.println(lineSensors[3]);
+  Serial.print(lineSensors[3]);
+  Serial.println(action[0]);
 
-  if (action == "A") {
-      straight(highSpeed, 2000);
-      routeCounter ++;
-  }
 
   // line sensing based on the two middle sensors always picking up white 
-  if (lineSensors[1] && lineSensors[2] && !lineSensors[0] && !lineSensors[4]){
+  if (lineSensors[1] && lineSensors[2] && !lineSensors[0] && !lineSensors[3]){
     // sensor0=0, sensor1=1, sensor2=1, sensor3=0
+    Serial.println("straight");
     straight();
   }
 
   // correction for staying on the line
-  if (lineSensors[1] && !lineSensors[2] && !lineSensors[0] && !lineSensors[4]) {
+  if (lineSensors[1] && !lineSensors[2] && !lineSensors[0] && !lineSensors[3]) {
     // sensor0=0, sensor1=1, sensor2=0, sensor3=0
-    turn_left(highSpeed, medSpeed);
+    Serial.println("correct left");
+    turn_left(highSpeed, medSpeed, false);
   }
   
   // correction for staying on the line
-  if (!lineSensors[1] && lineSensors[2] && !lineSensors[0] && !lineSensors[4]) {
+  if (!lineSensors[1] && lineSensors[2] && !lineSensors[0] && !lineSensors[3]) {
     // sensor0=0, sensor1=0, sensor2=1, sensor3=0
-    turn_right(highSpeed, medSpeed);
+    Serial.println("correct right");
+    turn_right(highSpeed, medSpeed, false);
   }
 
   // in case of a double t junction
   if (!lineSensors[1] && !lineSensors[2]) {
     // this will turn the car left the moment the middle two sensors detect black until they both detect white again
+    Serial.println("double t junction");
     while (!lineSensors[1] && !lineSensors[2]) {
-      lineSensorRead()
-      if (action == 'R') {
-        turn_right(150, lowSpeed); 
-    }
-      if (action == 'L') {
-        turn_left(150, lowSpeed); 
+      lineSensorRead();
+      if (action[0] == 'R') {
+        turn_right(180, 50, true); 
       }
+      if (action[0] == 'L') {
+        turn_left(180, 50, true); 
+      }
+      }
+    action++;
     }
-    routeCounter ++;
-  }
+
   
   // in case of a single right t junction 
   if (!lineSensors[0] && lineSensors[1] && lineSensors[2] && lineSensors[3]){
-    if (action == "R") {
-      turn_right(150, lowSpeed);
-      delay(1000);
-      while (!lineSensors[1] && !lineSensors[2]) {
-        lineSensorRead();
+    delay(500);
+    if (!lineSensors[0] && lineSensors[1] && lineSensors[2] && lineSensors[3]){
+      Serial.println("t right junction");
+      if (action[0] == 'R') {
+        turn_right(150, 100, true);
+        delay(1000);
+        while (!(lineSensors[1] && lineSensors[2])) {
+          lineSensorRead();
+          if (lineSensors[1] && lineSensors[2]) {
+            action ++;
+          }
+        }
+      
       }
-      routeCounter ++;
     }
-    if (action == "S"){
-      routeCounter ++;
-      straight(500);
-    }
+      if (action[0] == 'S'){
+        straight(1000);
+        action ++;
+      }
   }
 
   // in case of a single left t junction 
   if (lineSensors[0] && lineSensors[1] && lineSensors[2] && !lineSensors[3]){
-    if (action == "L") {
-      turn_left(150, lowSpeed);
-      delay(1000);
-      while (!lineSensors[1] && !lineSensors[2]) {
-        lineSensorRead();
+    delay(500);
+    if (lineSensors[0] && lineSensors[1] && lineSensors[2] && !lineSensors[3]){
+      Serial.println("t left junction");
+      if (action[0] == 'L') {
+        turn_left(150, 100, true);
+        delay(1000);
+        while (!lineSensors[1] && !lineSensors[2]) {
+          lineSensorRead();
+          if (lineSensors[1] && lineSensors[2]) {
+            action ++;
+          }
+        }
       }
-      routeCounter ++;
-    }
-    if (action == "S"){
-      routeCounter ++;
-      straight(500);
+      if (action[0] == 'S'){
+        straight(500);
+        action++;
+      }
     }
   }
-
+  if (lineSensors[0] &&  lineSensors[3]) {
+    if (action[0] == 'L') { 
+      turn_left(150, 100, true);
+      delay(1000);
+      while (!(lineSensors[1] && lineSensors[2])) {
+        lineSensorRead();
+      }
+      action ++;
+    }
+    if (action[0] == 'R') {
+      turn_right(150, 100, true);
+      delay(1000);
+      while (!(lineSensors[1] && lineSensors[2])) {
+        lineSensorRead();
+      }
+      action ++;
+    }
+  }
 }
 
 void navDecision() {
     lineSensorRead();
-    char action = route[routeCounter];
-    lineFollowing(action);
-    int routeLen = currentRoute.size();
-    if (action == "X"){
-      stop();
+    Serial.println(action[0]);
+    lineFollowing();
       //decide whether to pick up or put down block
       //if put down
         // that
@@ -227,4 +326,3 @@ void navDecision() {
 
       //LED malarkey
     }
-}
