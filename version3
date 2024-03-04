@@ -31,7 +31,7 @@ int delivCounter = 0;
 
 char testRoute[] = {'R', 'L', 'S', 'S' };
 char startP1[5] = {'L', 'R', 'X'};
-char P1Green[4] = {'L', 'L', 'X'};
+char P1Green[4] = {'L', 'L', 'W'};
 char P1Red[5] = {'B', 'R', 'S', 'R', 'X'};
 char greenP2[6] = {'Z', 'S', 'S', 'R', 'R', 'X'};
 char redP2[7] = {'Z', 'S', 'S', 'S', 'L', 'R', 'X'};
@@ -89,14 +89,10 @@ void loop() {
   //current action = L
   //if (digitalRead(buttonPin) == LOW) {
   if (routeCounter == 1) {
-    if (action[0] == 'X'){
-      /*
-      ultrasoundValue = ultrasound.read()
-      while (ultrasoundValue > 4) {
-        straight();
-        ultrasound read
-      
-    }*/
+    if (action[0] == 'X' || action[0] == 'W'){
+      if (action[0] == 'W'){
+        delay(300);
+      }
       stop();
       delay(1000);
       routeCounter++;
@@ -314,15 +310,4 @@ void navDecision() {
     lineSensorRead();
     Serial.println(action[0]);
     lineFollowing();
-      //decide whether to pick up or put down block
-      //if put down
-        // that
-        //update currentRoute
-        //increment delivCounter
-      //if pick up block
-        //detect colour
-        //update currentRoute
-      // reset routeCounter
-
-      //LED malarkey
     }
