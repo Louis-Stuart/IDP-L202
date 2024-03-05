@@ -1,15 +1,10 @@
 #include <Servo.h>
 
+//Gripper
 Servo liftServo;
 Servo gripperServo;
 
 bool block = false;
-
-int rampedServoMove(Servo &servoLocal, int currentDegree, int desiredDegree, int increment, int timeDelay = 25);
-void openGripper();
-void closeGripper();
-void liftGripper();
-void lowerGripper();
 
 int posGripperOpen =  15;
 int posGripperClose = 90; 
@@ -18,6 +13,23 @@ int posLiftDown = 50;
 int posCurrentGripper = 0;
 int posCurrentLift = 0;
 
+int rampedServoMove(Servo &servoLocal, int currentDegree, int desiredDegree, int increment, int timeDelay = 25);
+void openGripper();
+void closeGripper();
+void liftGripper();
+void lowerGripper();
+
+//Ultrasound
+float distance = 0;
+float sensitivity = 0;
+
+float getUltrasoundSensorReading(int pin = A0, float ADC_SOLUTION = 1023.0, int MAX_ULTRASOUND_RANG = 520);
+
+
+bool captureBlock();
+bool blockinRange(int range);
+
+
 void setup() {
   liftServo.attach(7);
   gripperServo.attach(8);
@@ -25,24 +37,12 @@ void setup() {
   posCurrentLift = posLiftUp;
   gripperServo.write(posGripperClose);
   posCurrentGripper = posGripperClose;
+  delay(1000);
+  Serial.begin(9600);
 }
 
 void loop() {
-  delay(500);
-  if (!block) {
-    closeGripper();
-    delay(500);
-    lowerGripper();
-    delay(500);
-    openGripper();
-    delay(500);
-    closeGripper();
-    delay(500);
-    liftGripper();
-    block = true;
-    delay(2000);
-    block = false;
-  }
+  captureBlock();
 }
 
 void liftGripper() {
@@ -74,4 +74,43 @@ int rampedServoMove(Servo &servoLocal, int currentDegree, int desiredDegree, int
     }
   }
   return desiredDegree;
+}
+
+
+float getUltrasoundSensorReading(int pin = A0, float ADC_SOLUTION = 1023.0, int MAX_ULTRASOUND_RANG = 520) {
+  sensitivity = analogRead(pin);
+  distance = sensitivity * MAX_ULTRASOUND_RANG / ADC_SOLUTION;
+  Serial.print(distance,0);
+  Serial.println("cm");
+  return distance;
+}
+
+
+bool blockinRange(int range) {
+    if (getUltrasoundSensorReading() < range) {
+      delay(50); // Wait for a short period to check again, ensuring it's not a false positive.
+      if (getUltrasoundSensorReading() < range) {
+        Serial.println("True returned in blockinRange"); 
+        return true; // Block is indeed within range.
+      }
+    }
+    return false; // In all other cases, return false.
+}
+
+bool captureBlock(){
+    closeGripper();
+    delay(500);
+    lowerGripper();
+    delay(100);
+    openGripper();
+    while (!blockinRange(5)){
+      delay(100);
+      //moveMotorFWD
+      Serial.println("In Loop");
+    }
+    closeGripper();
+    delay(500);
+    liftGripper();
+    delay(2000);
+    return true;
 }
