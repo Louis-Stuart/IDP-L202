@@ -6,8 +6,8 @@ Servo gripperServo;
 
 bool block = false;
 
-int posGripperOpen =  15;
-int posGripperClose = 90; 
+int posGripperOpen = 15;
+int posGripperClose = 90;
 int posLiftUp = 140;
 int posLiftDown = 50;
 int posCurrentGripper = 0;
@@ -30,6 +30,11 @@ bool captureBlock();
 bool blockinRange(int range);
 
 
+//Color Sensor
+float getColorSensorReading(int pin = 9);
+bool colorDetection();
+
+
 void setup() {
   liftServo.attach(7);
   gripperServo.attach(8);
@@ -43,6 +48,8 @@ void setup() {
 
 void loop() {
   captureBlock();
+  delay(5000);
+  Serial.println(colorDetection());
 }
 
 void liftGripper() {
@@ -80,37 +87,89 @@ int rampedServoMove(Servo &servoLocal, int currentDegree, int desiredDegree, int
 float getUltrasoundSensorReading(int pin = A0, float ADC_SOLUTION = 1023.0, int MAX_ULTRASOUND_RANG = 520) {
   sensitivity = analogRead(pin);
   distance = sensitivity * MAX_ULTRASOUND_RANG / ADC_SOLUTION;
-  Serial.print(distance,0);
+  Serial.print(distance, 0);
   Serial.println("cm");
   return distance;
 }
 
 
 bool blockinRange(int range) {
+  for (int i = 0; i < 2; i++) {
     if (getUltrasoundSensorReading() < range) {
-      delay(50); // Wait for a short period to check again, ensuring it's not a false positive.
-      if (getUltrasoundSensorReading() < range) {
-        Serial.println("True returned in blockinRange"); 
-        return true; // Block is indeed within range.
+      if (i == 1) {  // If it's the second iteration and the block is still in range
+        Serial.println("True returned in blockinRange");
+        return true;
       }
+      delay(50);  // Wait for a short period before checking again
+    } else {
+      return false;  // If the block is not in range in the first check, no need to wait or check again
     }
-    return false; // In all other cases, return false.
+  }
+  return false;  // In case the block was in range during the first check but not the second
 }
 
-bool captureBlock(){
-    closeGripper();
-    delay(500);
-    lowerGripper();
+
+bool captureBlock() {
+  int maxAttempts = 5;
+  closeGripper();  // Ensure gripper closed before lowering it
+  delay(500);
+
+  lowerGripper();
+  delay(100);
+
+  openGripper();
+
+  int count = 0;
+  while (!blockinRange(5) && count < maxAttempts) {  // Keep checking if the block is in range, up to max attempts
     delay(100);
-    openGripper();
-    while (!blockinRange(5)){
-      delay(100);
-      //moveMotorFWD
-      Serial.println("In Loop");
-    }
+    //Chassis drive straight with line following implemented
+    Serial.println("In Loop");
+    count++;
+  }
+
+  if (blockinRange(5)) {
     closeGripper();
     delay(500);
+
     liftGripper();
-    delay(2000);
-    return true;
+    delay(100);
+
+    return true;  // Indicate the block has been captured with confidence
+  } else {
+    closeGripper();
+    delay(500);
+
+    liftGripper();
+    delay(100);
+    return false;  // Indicate that the block capture was completed in doubt
+    // We could update this place to a pure return to false, and then implement another loop outside to allow it moves randomly to the front/back a bit with the gripper lowered, and then we restart the function from the top in that loop
+  }
+}
+
+
+//Return true if RED
+float getColorSensorReading(int pin = 9) {
+  return digitalRead(pin);
+}
+
+
+//Return true if RED
+bool colorDetection() {
+  bool previousDetection, currentDetection;
+  int attempts = 10;  // Max number of attempts before giving a less confident value returned
+
+  previousDetection = getColorSensorReading();
+  for (int i = 0; i < attempts; i++) {
+    delay(100);  // Wait before taking the next reading
+    currentDetection = getColorSensorReading();
+
+    if (previousDetection == currentDetection) {
+      return previousDetection;  // Return the stable detection value
+    }
+
+    previousDetection = currentDetection;
+  }
+
+  //Handle the case where a stable reading couldn't be obtained
+  return currentDetection;
 }
