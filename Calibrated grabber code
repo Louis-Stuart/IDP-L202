@@ -4,9 +4,13 @@ Servo liftServo;
 Servo gripperServo;
 
 bool block = false;
-int rampedServoMove(Servo &servoLocal, int currentDegree, int desiredDegree, int increment, int timeDelay = 50);
 
-// TODO: Adjust angle
+int rampedServoMove(Servo &servoLocal, int currentDegree, int desiredDegree, int increment, int timeDelay = 25);
+void openGripper();
+void closeGripper();
+void liftGripper();
+void lowerGripper();
+
 int posGripperOpen =  15;
 int posGripperClose = 90; 
 int posLiftUp = 140;
@@ -24,7 +28,6 @@ void setup() {
 }
 
 void loop() {
-  /*
   delay(500);
   if (!block) {
     closeGripper();
@@ -39,9 +42,8 @@ void loop() {
     block = true;
     delay(2000);
     block = false;
-    */
   }
-
+}
 
 void liftGripper() {
   posCurrentLift = rampedServoMove(liftServo, posCurrentLift, posLiftUp, 1);
@@ -59,7 +61,7 @@ void closeGripper() {
   posCurrentGripper = rampedServoMove(gripperServo, posCurrentGripper, posGripperClose, 1);
 }
 
-int rampedServoMove(Servo &servoLocal, int currentDegree, int desiredDegree, int increment, int timeDelay = 50) {
+int rampedServoMove(Servo &servoLocal, int currentDegree, int desiredDegree, int increment, int timeDelay = 25) {
   if (currentDegree < desiredDegree) {
     for (; currentDegree <= desiredDegree; currentDegree += increment) {
       servoLocal.write(currentDegree);
