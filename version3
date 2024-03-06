@@ -19,34 +19,35 @@ int buttonPin = 12; // Connect button to input pin 12
 
 int lineSensors[4];
 int lowSpeed = 0;
-int highSpeed = 180;
+int highSpeed = 250;
 int medSpeed = 90;
 char forward = BACKWARD;
 char backward = FORWARD;
 int routeCounter = 0;
 int delivCounter = 0;
+bool green = true;
 
 
 //predefining navigation arrays
 
 char testRoute[] = {'R', 'L', 'S', 'S' };
-char startP1[5] = {'L', 'R', 'X'};
-char P1Green[4] = {'L', 'L', 'W'};
-char P1Red[5] = {'B', 'R', 'S', 'R', 'X'};
-char greenP2[6] = {'Z', 'S', 'S', 'R', 'R', 'X'};
-char redP2[7] = {'Z', 'S', 'S', 'S', 'L', 'R', 'X'};
-char P2Green[6] = {'B', 'R', 'L', 'S', 'S', 'X'};
-char P2Red[7] = {'B', 'R', 'R', 'S', 'S', 'S', 'X'};
-char greenP3[6] = {'Z', 'S', 'S', 'S', 'R', 'X'};
-char redP3[5] = {'Z', 'S', 'S', 'L', 'X'};
-char P3Green[6] = {'B', 'R', 'S', 'S', 'S', 'X'};
-char P3Red[5] = {'B', 'L', 'S', 'S', 'X'};
-char greenP4[6] = {'Z', 'S', 'R', 'S', 'R', 'X'};
-char redP4[5] = {'Z', 'S', 'L', 'L', 'X'};
-char P4green[] = {'B', 'R', 'S', 'L', 'S', 'X'} ;
-char P4red[] = {'B', 'L', 'R', 'S', 'X'};
-char redFinish[4] = {'Z', 'L', 'L', 'X'};
-char greenFinish[5] = {'Z', 'R', 'S', 'R', 'X'};
+char startP1[] = {'L', 'R', 'X'};
+char P1Green[] = {'N', 'L', 'W'};
+char P1Red[] = {'M', 'S', 'R', 'W'};
+char greenP2[] = {'Z', 'S', 'S', 'R', 'R', 'X'};
+char redP2[] = {'Z', 'S', 'S', 'S', 'L', 'R', 'X'};
+char P2Green[] = {'M', 'L', 'S', 'S', 'W'};
+char P2Red[] = {'N', 'R', 'S', 'S', 'S', 'W'};
+char greenP3[] = {'Z', 'S', 'S', 'S', 'R', 'X'};
+char redP3[] = {'Z', 'S', 'S', 'L', 'X'};
+char P3Green[] = {'M', 'S', 'S', 'S', 'W'};
+char P3Red[] = {'N', 'S', 'S', 'W'};
+char greenP4[] = {'Z', 'S', 'R', 'S', 'R', 'X'};
+char redP4[] = {'Z', 'S', 'L', 'L', 'X'};
+char P4Green[] = {'M', 'S', 'L', 'S', 'W'} ;
+char P4Red[] = {'N', 'R', 'S', 'W'};
+char redFinish[] = {'Z', 'L', 'L', 'X'};
+char greenFinish[] = {'Z', 'R', 'S', 'R', 'X'};
 
 
 char *action;
@@ -85,32 +86,90 @@ void loop() {
     straight(highSpeed, 1500);
     routeCounter ++;
   }
-  //test any function by adding it in
-  //current action = L
-  //if (digitalRead(buttonPin) == LOW) {
   if (routeCounter == 1) {
     if (action[0] == 'X' || action[0] == 'W'){
       if (action[0] == 'W'){
-        delay(300);
+        delay(500);
+        if (delivCounter == 0) {
+          if (green) {
+            action = greenP2;
+          }
+          if (!green) {
+            action = redP2;
+        }
+        }
+        if (delivCounter == 1) {
+          if (green) {
+            action = greenP3;
+          }
+          if (!green) {
+            action = redP3;
+        }
+        }
+        if (delivCounter == 2) {
+          if (green) {
+            action = greenP4;
+          }
+          if (!green) {
+            action = redP4;
+        }
+        }
+        if (delivCounter == 3) {
+          if (green) {
+            action = greenFinish;
+          }
+          if (!green) {
+            action = redFinish;
+        }
+        }
+        Serial.println(action);
+        delivCounter++;
       }
-      stop();
-      delay(1000);
-      routeCounter++;
-    }
+      if (action[0] == 'X'){
+        if (delivCounter == 0) {
+          if (green) {
+            action = P1Green;
+          }
+          if (!green) {
+            action = P1Red;
+        }
+        }
+        if (delivCounter == 1) {
+          if (green) {
+            action = P2Green;
+          }
+          if (!green) {
+            action = P2Red;
+        }
+        }
+        if (delivCounter == 2) {
+          if (green) {
+            action = P3Green;
+          }
+          if (!green) {
+            action = P3Red;
+        }
+        }
+        if (delivCounter == 3) {
+          if (green) {
+            action = P4Green;
+          }
+          if (!green) {
+            action = P4Red;
+        }
+        }
+        Serial.println(action);
+      }
+        stop();
+        delay(1000);
+        routeCounter++;
+      }
+      
     else{
       navDecision();
     }
   }
   
-
-  /*}
-  else{
-    action = testRoute; // define the action pointer to point to the address of the first element of the inital array
-    routeCounter = 0;
-    delivCounter = 0;
-    stop(2000);
-  }
-*/
   
     if (routeCounter == 2) {
       lineSensorRead();
@@ -119,7 +178,6 @@ void loop() {
       }
       else {
         stop();
-        action = P1Green;
         routeCounter = 1;
     }
   }
@@ -232,10 +290,10 @@ void lineFollowing() {
     while (!lineSensors[1] && !lineSensors[2]) {
       lineSensorRead();
       if (action[0] == 'R') {
-        turn_right(180, 50, true); 
+        turn_right(250, 80, true); 
       }
       if (action[0] == 'L') {
-        turn_left(180, 50, true); 
+        turn_left(250, 80, true); 
       }
       }
     action++;
@@ -244,20 +302,16 @@ void lineFollowing() {
   
   // in case of a single right t junction 
   if (!lineSensors[0] && lineSensors[1] && lineSensors[2] && lineSensors[3]){
-    delay(500);
-    if (!lineSensors[0] && lineSensors[1] && lineSensors[2] && lineSensors[3]){
       Serial.println("t right junction");
       if (action[0] == 'R') {
-        turn_right(150, 100, true);
+        turn_right(250, 150, true);
         delay(1000);
         while (!(lineSensors[1] && lineSensors[2])) {
           lineSensorRead();
           if (lineSensors[1] && lineSensors[2]) {
             action ++;
           }
-        }
-      
-      }
+        }  
     }
       if (action[0] == 'S'){
         straight(1000);
@@ -267,11 +321,9 @@ void lineFollowing() {
 
   // in case of a single left t junction 
   if (lineSensors[0] && lineSensors[1] && lineSensors[2] && !lineSensors[3]){
-    delay(500);
-    if (lineSensors[0] && lineSensors[1] && lineSensors[2] && !lineSensors[3]){
       Serial.println("t left junction");
       if (action[0] == 'L') {
-        turn_left(150, 100, true);
+        turn_left(250, 100, true);
         delay(1000);
         while (!lineSensors[1] && !lineSensors[2]) {
           lineSensorRead();
@@ -284,26 +336,36 @@ void lineFollowing() {
         straight(500);
         action++;
       }
-    }
   }
-  if (lineSensors[0] &&  lineSensors[3]) {
-    if (action[0] == 'L') { 
-      turn_left(150, 100, true);
+  //reverse
+    if (action[0] == 'N') { 
+      turn_left(250, 100, true);
       delay(1000);
       while (!(lineSensors[1] && lineSensors[2])) {
         lineSensorRead();
       }
       action ++;
     }
-    if (action[0] == 'R') {
-      turn_right(150, 100, true);
+    if (action[0] == 'M') {
+      turn_right(250, 100, true);
       delay(1000);
       while (!(lineSensors[1] && lineSensors[2])) {
         lineSensorRead();
       }
       action ++;
     }
-  }
+    if (action[0] == 'Z') {
+      if (green) {
+        turn_left(250,250,true);
+      }
+      else{
+        turn_right(250,250,true);
+      }
+      delay(1000);
+      while (!(lineSensors[1] && lineSensors[2])) {
+        lineSensorRead();
+      }
+    }
 }
 
 void navDecision() {
