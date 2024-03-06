@@ -90,6 +90,7 @@ float getUltrasoundSensorReading(int pin = A0, float ADC_SOLUTION = 1023.0, int 
 
 bool captureBlock();
 bool blockinRange(int range);
+bool dropBlock();
 
 //Color Sensor
 float getColorSensorReading(int pin = 9);
@@ -127,6 +128,8 @@ void loop() {
     if (action[0] == 'X' || action[0] == 'W'){
       if (action[0] == 'W'){
         delay(500);
+        stop();
+        dropBlock();
         if (delivCounter == 0) {
           if (green) {
             action = greenP2;
@@ -383,18 +386,20 @@ void lineFollowing() {
   //reverse
     if (action[0] == 'N') { 
       turn_left(250, 100, true);
-      delay(1000);
-      while (!(lineSensors[1] && lineSensors[2])) {
+      delay(800);
+      while (!lineSensors[1] && !lineSensors[2]) {
         lineSensorRead();
       }
+      stop();
       action ++;
     }
     if (action[0] == 'M') {
       turn_right(250, 100, true);
-      delay(1000);
-      while (!(lineSensors[1] && lineSensors[2])) {
+      delay(800);
+      while (!lineSensors[1] && !lineSensors[2]) {
         lineSensorRead();
       }
+      stop();
       action ++;
     }
     if (action[0] == 'Z') {
@@ -496,7 +501,7 @@ bool captureBlock() {
     lineFollowingStraight(150, 30);
   }*/
 
-  for (int i = 0; i <= 50; i += 1){
+  for (int i = 0; i <= 85; i += 1){
     lineFollowingStraight(250, 30);
     delay(10);
   }
@@ -526,6 +531,18 @@ bool captureBlock() {
     return false;  // Indicate that the block capture was completed in doubt
     // We could update this place to a pure return to false, and then implement another loop outside to allow it moves randomly to the front/back a bit with the gripper lowered, and then we restart the function from the top in that loop
   }
+}
+
+bool dropBlock(){
+  stop();
+  lowerGripper();
+  delay(100);
+  openGripper();
+  delay(100);
+  reverse(180,500);
+  closeGripper();
+  delay(100);
+  liftGripper();
 }
 
 
