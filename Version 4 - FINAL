@@ -1,0 +1,627 @@
+#include <Adafruit_MotorShield.h>
+#include <Servo.h>
+#include <arduino-timer.h>
+
+//Gripper
+Servo liftServo;
+Servo gripperServo;
+
+Adafruit_MotorShield AFMS = Adafruit_MotorShield();
+Adafruit_DCMotor *leftMotor = AFMS.getMotor(1);
+Adafruit_DCMotor *rightMotor = AFMS.getMotor(2);
+
+auto timer = timer_create_default();
+
+int leftmostlinesensorPin = 1;
+int leftlinesensorPin = 2;
+int rightlinesensorPin = 3;
+int rightmostlinesensorPin = 4;
+int redLEDPin = 10;
+int greenLEDPin = 11;
+int blueLEDPin =  12;
+int buttonPin = 13; // Connect button to input pin 12
+
+
+
+//define constant
+
+int lineSensors[4];
+int lowSpeed = 0;
+int highSpeed = 250;
+int medSpeed = 90;
+char forward = BACKWARD;
+char backward = FORWARD;
+int routeCounter = 0;
+int delivCounter = 0;
+bool green = true;
+bool block = false;
+int posGripperOpen = 5;
+int posGripperClose = 90;
+int posLiftUp = 140;
+int posLiftDown = 50;
+int posCurrentGripper = 0;
+int posCurrentLift = 0;
+
+//predefining navigation arrays
+
+char testRoute[] = {'R', 'L', 'S', 'S' };
+char startP1[] = {'L', 'R', 'X'};
+char P1Green[] = {'N','L','L', 'W'};
+char P1Red[] = {'M','R', 'S', 'R', 'W'};
+char greenP2[] = {'Z', 'S','S', 'R', 'R', 'X'};
+char redP2[] = {'Z', 'S', 'S', 'S', 'L', 'R', 'X'};
+char P2Green[] = {'M', 'R', 'L', 'S', 'S', 'W'};
+char P2Red[] = {'N', 'L', 'L', 'S', 'R', 'S', 'W'};
+char greenP3[] = {'Z', 'S', 'S', 'R', 'X'};
+char redP3[] = {'Z', 'S', 'L', 'X'};
+char P3Green[] = {'M', 'S', 'S', 'S', 'W'};
+char P3Red[] = {'N', 'S', 'S', 'W'};
+char greenP4[] = {'Z','R', 'S', 'R', 'X'};
+char redP4[] = {'Z', 'L', 'L', 'X'};
+char P4Green[] = {'M', 'S', 'L', 'S', 'W'} ;
+char P4Red[] = {'N', 'R', 'S', 'W'};
+char redFinish[] = {'Z', 'L', 'L', 'X'};
+char greenFinish[] = {'Z', 'R', 'S', 'R', 'X'};
+
+
+char *action;
+
+//predefine function
+void lineSensorRead();
+void lineFollowing();
+void lineFollowingStraight();
+void stop(int t=0);
+void straight(int speed=highSpeed, int t=0);
+void reverse(int speed=highSpeed, int t=0);
+void turn(int high, int low, bool left);
+void turn_right();
+void turn_left();
+void navDecision();
+void actionTranslate(char action); 
+
+int rampedServoMove(Servo &servoLocal, int currentDegree, int desiredDegree, int increment, int timeDelay = 35);
+void openGripper();
+void closeGripper();
+void liftGripper();
+void lowerGripper();
+
+//Ultrasound
+float distance = 0;
+float sensitivity = 0;
+
+float getUltrasoundSensorReading(int pin = A0, float ADC_SOLUTION = 1023.0, int MAX_ULTRASOUND_RANG = 520);
+
+
+bool captureBlock();
+bool blockinRange(int range);
+bool dropBlock();
+
+//Color Sensor
+float getColorSensorReading(int pin = 9);
+bool colorDetection();
+
+void toggleLED(){
+  digitalWrite(blueLEDPin, !digitalRead(blueLEDPin));
+}
+
+void setup() {
+  liftServo.attach(7);
+  gripperServo.attach(8);
+  liftServo.write(posLiftUp);
+  posCurrentLift = posLiftUp;
+  gripperServo.write(posGripperClose);
+  posCurrentGripper = posGripperClose;
+  Serial.begin(9600);           
+  if (!AFMS.begin()) {        
+    Serial.println("Could not find Motor Shield. Check wiring.");
+    while (1);
+  }
+  pinMode(leftmostlinesensorPin, INPUT); // declare LED as output
+  pinMode(leftlinesensorPin, INPUT); // declare Micro switch as input
+  pinMode(rightlinesensorPin, INPUT); // declare LED as output
+  pinMode(rightmostlinesensorPin, INPUT); // declare Micro switch as input
+  pinMode(buttonPin, INPUT); // declare pushbutton as input
+
+  pinMode(blueLEDPin, OUTPUT);
+  pinMode(redLEDPin, OUTPUT);
+  pinMode(greenLEDPin, OUTPUT);
+
+  // call the toggle_led function every 500 ms
+  timer.every(500, toggleLED);
+
+  action = startP1; // define the action pointer to point to the address of the first element of the inital array
+}
+
+
+//main
+void loop() {
+  timer.tick();
+
+  if (routeCounter == 0) {
+    straight(highSpeed, 1500);
+    routeCounter ++;
+  }
+  if (routeCounter == 1) {
+    if (action[0] == 'X' || action[0] == 'W'){
+      if (action[0] == 'W'){
+        delay(500);
+        stop();
+        dropBlock();
+        if (delivCounter == 0) {
+          if (green) {
+            action = greenP2;
+          }
+          if (!green) {
+            action = redP2;
+        }
+        }
+        if (delivCounter == 1) {
+          if (green) {
+            action = greenP3;
+          }
+          if (!green) {
+            action = redP3;
+        }
+        }
+        if (delivCounter == 2) {
+          if (green) {
+            action = greenP4;
+          }
+          if (!green) {
+            action = redP4;
+        }
+        }
+        if (delivCounter == 3) {
+          if (green) {
+            action = greenFinish;
+          }
+          if (!green) {
+            action = redFinish;
+        }
+        }
+        Serial.println(action);
+        delivCounter++;
+      }
+      if (action[0] == 'X'){
+          captureBlock();
+          //Serial.println(colorDetection());
+        if (delivCounter == 0) {
+          if (green) {
+            action = P1Green;
+          }
+          if (!green) {
+            action = P1Red;
+        }
+        }
+        if (delivCounter == 1) {
+          if (green) {
+            action = P2Green;
+          }
+          if (!green) {
+            action = P2Red;
+        }
+        }
+        if (delivCounter == 2) {
+          if (green) {
+            action = P3Green;
+          }
+          if (!green) {
+            action = P3Red;
+        }
+        }
+        if (delivCounter == 3) {
+          if (green) {
+            action = P4Green;
+          }
+          if (!green) {
+            action = P4Red;
+        }
+        }
+        Serial.println(action);
+        stop();
+        delay(1000);
+        routeCounter++;
+        }
+      }
+      
+    else{
+      navDecision();
+    }
+  }
+  
+  
+    if (routeCounter == 2) {
+      lineSensorRead();
+      if (!lineSensors[0] && !lineSensors[3]) {
+        reverse(150);
+      }
+      else {
+        stop();
+        routeCounter = 1;
+    }
+  }
+
+}
+
+void stop(int t=0) {
+  leftMotor->setSpeed(0);
+  rightMotor->setSpeed(0);
+  //might need to run(release)
+  delay(t);
+}
+
+void straight(int speed=highSpeed, int t=0) {
+  leftMotor->run(forward);
+  rightMotor->run(forward);
+  leftMotor->setSpeed(speed);
+  rightMotor->setSpeed(speed);
+  delay(t);
+}
+
+void reverse(int speed, int t) {
+  leftMotor->run(backward);
+  rightMotor->run(backward);
+  leftMotor->setSpeed(speed);
+  rightMotor->setSpeed(speed);
+  delay(t); 
+}
+
+void turn(int high, int low, bool left, bool rev) {
+  if(left){
+    if (rev) {
+      leftMotor->run(backward);
+      rightMotor->run(forward);
+      leftMotor->setSpeed(low);
+      rightMotor->setSpeed(high);
+    }
+    if (!rev) {
+      leftMotor->run(forward);
+      rightMotor->run(forward);
+      leftMotor->setSpeed(low);
+      rightMotor->setSpeed(high);
+    }
+  }
+  else{
+    if (rev) {
+      leftMotor->run(forward);
+      rightMotor->run(backward);
+      leftMotor->setSpeed(high);
+      rightMotor->setSpeed(low);
+    }
+    if (!rev) {
+      leftMotor->run(forward);
+      rightMotor->run(forward);
+      leftMotor->setSpeed(high);
+      rightMotor->setSpeed(low);
+    }
+  }
+}
+
+void turn_left(int high, int low, bool rev) {
+  turn(high,low,true, rev);
+}
+
+void turn_right(int high, int low, bool rev) {
+  turn(high,low,false, rev);
+}
+
+void lineSensorRead(){
+  lineSensors[0] = digitalRead(leftmostlinesensorPin);
+  lineSensors[1] = digitalRead(leftlinesensorPin);
+  lineSensors[2] = digitalRead(rightlinesensorPin);
+  lineSensors[3] = digitalRead(rightmostlinesensorPin);
+}
+
+void lineFollowingStraight(int high, int low) {
+  lineSensorRead();
+  // line sensing based on the two middle sensors always picking up white 
+  if (lineSensors[1] && lineSensors[2] && !lineSensors[0] && !lineSensors[3]){
+    // sensor0=0, sensor1=1, sensor2=1, sensor3=0
+    Serial.println("straight");
+    straight(high);
+  }
+
+  // correction for staying on the line
+  if (lineSensors[1] && !lineSensors[2] && !lineSensors[0] && !lineSensors[3]) {
+    // sensor0=0, sensor1=1, sensor2=0, sensor3=0
+    Serial.println("correct left");
+    turn_left(high, low, false);
+  }
+  
+  // correction for staying on the line
+  if (!lineSensors[1] && lineSensors[2] && !lineSensors[0] && !lineSensors[3]) {
+    // sensor0=0, sensor1=0, sensor2=1, sensor3=0
+    Serial.println("correct right");
+    turn_right(high, low, false);
+  }
+}
+
+void lineFollowing() {
+  lineSensorRead();
+  Serial.print(lineSensors[0]);
+  Serial.print(lineSensors[1]);
+  Serial.print(lineSensors[2]);
+  Serial.print(lineSensors[3]);
+  Serial.println(action[0]);
+
+
+  lineFollowingStraight(highSpeed, medSpeed);
+
+  // in case of a double t junction
+  if (!lineSensors[1] && !lineSensors[2] && action[0] != 'Z') {
+    // this will turn the car left the moment the middle two sensors detect black until they both detect white again
+    Serial.println("double t junction");
+    while (!lineSensors[1] && !lineSensors[2]) {
+      lineSensorRead();
+      if (action[0] == 'R') {
+        turn_right(250, 130, true); 
+      }
+      if (action[0] == 'L') {
+        turn_left(250, 130, true); 
+      }
+      }
+    action++;
+    }
+
+  
+  // in case of a single right t junction 
+  if (!lineSensors[0] && lineSensors[1] && lineSensors[2] && lineSensors[3]){
+      Serial.println("t right junction");
+      if (action[0] == 'R') {
+        turn_right(250, 150, true);
+        delay(1000);
+        while (!(lineSensors[1] && lineSensors[2])) {
+          lineSensorRead();
+          if (lineSensors[1] && lineSensors[2]) {
+            action ++;
+          }
+        }  
+    }
+      if (action[0] == 'S'){
+        straight(1000);
+        action ++;
+      }
+  }
+
+  // in case of a single left t junction 
+  if (lineSensors[0] && lineSensors[1] && lineSensors[2] && !lineSensors[3]){
+      Serial.println("t left junction");
+      if (action[0] == 'L') {
+        turn_left(250, 150, true);
+        delay(1000);
+        while (!(lineSensors[1] && lineSensors[2])) {
+          lineSensorRead();
+          if (lineSensors[1] && lineSensors[2]) {
+            action ++;
+          }
+        }
+      }
+      if (action[0] == 'S'){
+        straight(500);
+        action++;
+      }
+  }
+  //reverse
+    if (action[0] == 'N') { 
+      turn_left(200, 80, true);
+      delay(1200);
+      while (!lineSensors[1] && !lineSensors[2]) {
+        lineSensorRead();
+      }
+      action ++;
+    }
+    if (action[0] == 'M') {
+      turn_right(200, 80, true);
+      delay(1200);
+      while (!lineSensors[1] && !lineSensors[2]) {
+        lineSensorRead();
+      }
+      action ++;
+    }
+    if (action[0] == 'Z') {
+      Serial.println("we are turning out of the bay hopefully");
+      if (green) {
+        turn_left(250,250,true);
+      }
+      else{
+        turn_right(250,250,true);
+      }
+      delay(2500);
+      while (!(lineSensors[1] && lineSensors[2])) {
+        Serial.println("turning");
+        lineSensorRead();
+      }
+      stop();
+      action++;
+    }
+}
+
+void navDecision() {
+    lineSensorRead();
+    Serial.println(action[0]);
+    lineFollowing();
+    }
+
+
+
+void liftGripper() {
+  posCurrentLift = rampedServoMove(liftServo, posCurrentLift, posLiftUp, 1);
+}
+
+void lowerGripper() {
+  posCurrentLift = rampedServoMove(liftServo, posCurrentLift, posLiftDown, 1);
+}
+
+void openGripper() {
+  posCurrentGripper = rampedServoMove(gripperServo, posCurrentGripper, posGripperOpen, 1);
+}
+
+void closeGripper() {
+  posCurrentGripper = rampedServoMove(gripperServo, posCurrentGripper, posGripperClose, 1);
+}
+
+int rampedServoMove(Servo &servoLocal, int currentDegree, int desiredDegree, int increment, int timeDelay = 35) {
+  if (currentDegree < desiredDegree) {
+    for (; currentDegree <= desiredDegree; currentDegree += increment) {
+      servoLocal.write(currentDegree);
+      delay(timeDelay);
+    }
+  } else {
+    for (; currentDegree >= desiredDegree; currentDegree -= increment) {
+      servoLocal.write(currentDegree);
+      delay(timeDelay);
+    }
+  }
+  return desiredDegree;
+}
+
+
+float getUltrasoundSensorReading(int pin = A0, float ADC_SOLUTION = 1023.0, int MAX_ULTRASOUND_RANG = 520) {
+  sensitivity = analogRead(pin);
+  distance = sensitivity * MAX_ULTRASOUND_RANG / ADC_SOLUTION;
+  Serial.print(distance, 0);
+  Serial.println("cm");
+  return distance;
+}
+
+
+bool blockinRange(int range) {
+  for (int i = 0; i < 2; i++) {
+    if (getUltrasoundSensorReading() < range) {
+      if (i == 1) {  // If it's the second iteration and the block is still in range
+        Serial.println("True returned in blockinRange");
+        return true;
+      }
+      delay(50);  // Wait for a short period before checking again
+    } else {
+      return false;  // If the block is not in range in the first check, no need to wait or check again
+    }
+  }
+  return false;  // In case the block was in range during the first check but not the second
+}
+
+
+bool captureBlock() {
+  stop();
+
+  reverse(180, 1000);
+  stop();
+
+  int maxAttempts = 5;
+  closeGripper();  // Ensure gripper closed before lowering it
+  delay(500);
+
+  lowerGripper();
+  delay(100);
+
+  openGripper();
+
+  /*while (getUltrasoundSensorReading() >= 5) {
+    Serial.println(getUltrasoundSensorReading());
+    lineFollowingStraight(150, 30);
+  }*/
+
+  for (int i = 0; i <= 100; i += 1){
+    lineFollowingStraight(250, 30);
+    delay(10);
+  }
+  stop();
+
+  int count = 0;
+  while (!blockinRange(5) && count < maxAttempts) {  // Keep checking if the block is in range, up to max attempt
+    Serial.println("In Loop");
+    count++;
+  }
+  stop();
+
+  if (blockinRange(5)) {
+    closeGripper();
+
+    //need to detect colour! 
+
+    //light correct LED based on found colour, turn off incorrect LED, stay stationary for 5 secs, as per rules
+    if (green){
+      digitalWrite(redLEDPin, LOW);
+      digitalWrite(greenLEDPin, HIGH);
+      delay(5000);
+    }
+    else{
+      digitalWrite(greenLEDPin, LOW);
+      digitalWrite(redLEDPin, HIGH);
+      delay(5000);
+    }
+
+    reverse(180, 150);
+    stop();
+
+    liftGripper();
+    delay(100);
+
+    return true;  // Indicate the block has been captured with confidence
+  } else {
+    closeGripper();
+    delay(100);
+
+    //light correct LED based on found colour, turn off incorrect LED, stay stationary for 5 secs, as per rules
+    if (green){
+      digitalWrite(redLEDPin, LOW);
+      digitalWrite(greenLEDPin, HIGH);
+      delay(5000);
+    }
+    else{
+      digitalWrite(greenLEDPin, LOW);
+      digitalWrite(redLEDPin, HIGH);
+      delay(5000);
+    }
+
+    liftGripper();
+    delay(100);
+    return false;  // Indicate that the block capture was completed in doubt
+    // We could update this place to a pure return to false, and then implement another loop outside to allow it moves randomly to the front/back a bit with the gripper lowered, and then we restart the function from the top in that loop
+  }
+}
+
+bool dropBlock(){
+  for (int i = 0; i <= 50; i += 1){
+    lineFollowingStraight(250, 30);
+    delay(10);
+  }
+  stop();
+  lowerGripper();
+  delay(100);
+  openGripper();
+  delay(100);
+  reverse(180,700);
+  stop();
+  closeGripper();
+  delay(100);
+  liftGripper();
+}
+
+
+//Return true if RED
+float getColorSensorReading(int pin = 9) {
+  return digitalRead(pin);
+}
+
+
+//Return true if RED
+bool colorDetection() {
+  bool previousDetection, currentDetection;
+  int attempts = 10;  // Max number of attempts before giving a less confident value returned
+
+  previousDetection = getColorSensorReading();
+  for (int i = 0; i < attempts; i++) {
+    delay(100);  // Wait before taking the next reading
+    currentDetection = getColorSensorReading();
+
+    if (previousDetection == currentDetection) {
+      return previousDetection;  // Return the stable detection value
+    }
+
+    previousDetection = currentDetection;
+  }
+
+  //Handle the case where a stable reading couldn't be obtained
+  return currentDetection;
+}
