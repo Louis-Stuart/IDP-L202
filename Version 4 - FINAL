@@ -42,6 +42,7 @@ int posLiftDown = 70;
 int posPartialLiftDown = 110;
 int posCurrentGripper = 0;
 int posCurrentLift = 0;
+int run = 1;
 
 //predefining navigation arrays
 
@@ -50,19 +51,19 @@ char startP1[] = {'L', 'R', 'X'}; //correct
 char P1Green[] = {'N','L','L', 'W'}; //correct
 char P1Red[] = {'M','R', 'S', 'R', 'W'}; //correct
 char greenP2[] = {'Z', 'S', 'S', 'R', 'R', 'X'}; //correct
-char redP2[] = {'Z','S','S','S','L', 'R', 'X'}; //correct
+char redP2[] = {'Z','S','S','S','S','L', 'R', 'X'}; //correct
 char P2Green[] = {'M', 'R', 'L', 'S' ,'S','S','W'}; //correct
 char P2Red[] = {'N','L','L', 'S', 'R', 'S', 'W'}; //correct
-char greenP3[] = {'Z','S','S','S','R', 'X'}; //needs to be checked
-char redP3[] = {'Z', 'S','S','L','X'}; //needs to be checked
-char P3Green[] = {'M','R','S', 'S', 'S', 'W'}; //needs to be checked
-char P3Red[] = {'N','L','S', 'S', 'W'}; //needs to be checked
-char greenP4[] = {'Z','S','R', 'S', 'R', 'X'}; //needs to be checked
+char greenP3[] = {'Z','S','S','S','S','R','X'}; //correct
+char redP3[] = {'Z','S','S','S','L','X'}; //correct
+char P3Green[] = {'M','R','S','S', 'S', 'S', 'W'}; //needs to be checked
+char P3Red[] = {'N','L','S', 'S','S','W'}; //needs to be checked
+char greenP4[] = {'Z','S','S','R', 'S', 'R', 'X'}; //needs to be checked
 char redP4[] = {'Z','L','L', 'L', 'X'}; //needs to be checked
 char P4Green[] = {'M','R','S', 'L', 'S', 'W'} ; //needs to be checked
 char P4Red[] = {'N','L','R', 'S', 'W'}; //needs to be checked
 char redFinish[] = {'Z','L','X'}; //needs to have code written to not ignore, maybe new action instruction
-char greenFinish[] = {'Z','S', 'R', 'X'}; //needs to have code written to not ignore, maybe new action instruction
+char greenFinish[] = {'Z','R','X'}; //needs to have code written to not ignore, maybe new action instruction
 
 
 char *action;
@@ -143,7 +144,7 @@ while(digitalRead(buttonPin)==0) {
   Serial.println("Button is not pressed, do not move please");
 }
 Serial.println("Button is pressed, move please");
-while(1) {
+while(run == 1) {
   timer.tick();
 
   if (routeCounter == 0) {
@@ -174,7 +175,7 @@ while(1) {
           }
           if (!green) {
             action = redP3;
-        }
+          }
         }
         if (delivCounter == 2) {
           if (green) {
@@ -199,16 +200,16 @@ while(1) {
       }
       if (action[0] == 'X'){
         if (delivCounter == 0) {
-          captureBlock(50);
+          captureBlock(60);
         }
         if (delivCounter == 1) {
           captureBlock(110);
         }
         if (delivCounter == 2) {
-          captureBlock(110);
+          captureBlock(70);
         }
         if (delivCounter == 3) {
-          captureBlock(80);
+          captureBlock(50);
         }
         if (delivCounter == 0) {
           if (green) {
@@ -258,7 +259,7 @@ while(1) {
     if (routeCounter == 2) {
       lineSensorRead();
       if (!lineSensors[0] && !lineSensors[3]) {
-        reverse(150);
+        reverse(200);
       }
       else {
         stop();
@@ -384,7 +385,7 @@ void lineFollowing() {
       }
       }
     for (int i = 0; i <= 20; i += 1){
-          lineFollowingStraight(250, 30);
+          lineFollowingStraight(250, 50);
           delay(10);
         }
     action++;
@@ -410,7 +411,7 @@ void lineFollowing() {
     }
       if (action[0] == 'S'){
         for (int i = 0; i <= 100; i += 1){
-          lineFollowingStraight(250, 30);
+          lineFollowingStraight(250, 50);
           delay(10);
         }
         action ++;
@@ -436,7 +437,7 @@ void lineFollowing() {
       }
       if (action[0] == 'S'){
         for (int i = 0; i <= 100; i += 1){
-          lineFollowingStraight(250, 30);
+          lineFollowingStraight(250, 50);
           delay(10);
         }
         action++;
@@ -457,7 +458,7 @@ void lineFollowing() {
       action ++;
     }
     if (action[0] == 'M') {
-      turn_right(200, 80, true);
+      turn_right(200, 150, true);
       delay(200);
       delay(200);
       delay(200);
@@ -477,7 +478,7 @@ void lineFollowing() {
       else{
         turn_right(250,250,true);
       }
-      if (delivCounter == 3) {
+      if (delivCounter == 4) {
         delay(500);
       }
       else {
@@ -581,7 +582,7 @@ bool captureBlock(int t) {
   }*/
 
   for (int i = 0; i <= t; i += 1){
-    lineFollowingStraight(250, 30);
+    lineFollowingStraight(250, 50);
     delay(10);
   }
   stop();
@@ -621,11 +622,15 @@ bool captureBlock(int t) {
     closeGripper();
     delay(100);
 
+    /*
     if (colorDetection()) {
       green = false;
     }
     Serial.print("Green:");
     Serial.println(green);
+    */
+
+    green = !(colorDetection()); 
 
     //light correct LED based on found colour, turn off incorrect LED, stay stationary for 5 secs, as per rules
     if (green){
@@ -647,8 +652,8 @@ bool captureBlock(int t) {
 }
 
 bool dropBlock(){
-  for (int i = 0; i <= 60; i += 1){
-    lineFollowingStraight(250, 30);
+  for (int i = 0; i <= 50; i += 1){
+    lineFollowingStraight(250, 50);
     delay(10);
   }
   stop();
