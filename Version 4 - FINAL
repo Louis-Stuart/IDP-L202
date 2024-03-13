@@ -1,17 +1,22 @@
+//Import motor, servo and timer (for the flashing LED) libraries
 #include <Adafruit_MotorShield.h>
 #include <Servo.h>
 #include <arduino-timer.h>
 
 //Gripper
+//Define the 2 servo variables
 Servo liftServo;
 Servo gripperServo;
 
+//Initialise motor shield and define motor variables
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 Adafruit_DCMotor *leftMotor = AFMS.getMotor(1);
 Adafruit_DCMotor *rightMotor = AFMS.getMotor(2);
 
+//Initialise timer for the LED
 auto timer = timer_create_default();
 
+//Define Arduino pins for the line sensors, LEDs and Button
 int leftmostlinesensorPin = 1;
 int leftlinesensorPin = 2;
 int rightlinesensorPin = 3;
@@ -24,29 +29,58 @@ int buttonPin = 13; // Connect button to input pin 12
 
 
 //define constant
+int buttonPin = 13;
 
+//Define array to hold line sensor outputs (position 0 = leftmost, position 3 = rightmost)
 int lineSensors[4];
+
+//Define standard motor speeds (0 = stopped, 250 = maximum)
 int lowSpeed = 0;
 int highSpeed = 250;
 int medSpeed = 90;
+
+//Define forward and backward commands for the motors (due to the orientation of the motors, these are opposite to the standard commands)
 char forward = BACKWARD;
 char backward = FORWARD;
+
+//Define counter variables for the position along the route and the number of blocks delivered
 int routeCounter = 0;
 int delivCounter = 0;
+
+//Define Boolean var for whether the block is green (actually black) or not green (red)
 bool green = true;
+//Define Boolean var for whether the block is currently picked up
 bool block = false;
+
+//Sets servo positions for the limits of the grabber motion (limited physically)
+//These positions also are used in the initialisation of the grabber mechanism to the standard start position
 int posGripperOpen = 5;
 int posGripperClose = 90;
 int posLiftUp = 150;
 int posLiftDown = 70;
 int posPartialLiftDown = 110;
+//Defines variables for the current positions of the grabber
 int posCurrentGripper = 0;
 int posCurrentLift = 0;
+
+//Defines a Boolean variable for stopping the robot once it returns to the start
 bool run = true;
 
-//predefining navigation arrays
+//Defines the set routes between the start, pickup points and delivery points
 
+//Each array consists of multiple actions:
+//L - At the next detected junction (single or double T), turn left;
+//R - At the next detected junction, turn right;
+//S - At the next detected junction, keep straight;
+//X - Stop at the pick-up point (then choose next route and pick up block);
+//W - Stop at delivery point (then choose next route and drop block);
+//N - Turn left after reversing out of pick-up point;
+//M - Turn right after reversing out of pick-up point;
+//Z - Rotate 180 degrees after reversing from delivery point;
 
+//start - the start
+//green / red - the green / red delivery points
+//P1 / P2 / P3 / P4 - the pick-up points, P1 being the nearest, then each succesive pick-up is clockwise from P1
 char startP1[] = {'L', 'R', 'X'}; //correct
 char P1Green[] = {'N','L','L', 'W'}; //correct
 char P1Red[] = {'M','R', 'S', 'R', 'W'}; //correct
@@ -59,16 +93,16 @@ char redP3[] = {'Z','S','S','S','L','X'}; //correct
 char P3Green[] = {'M','R','S','S', 'S', 'S', 'W'}; //needs to be checked
 char P3Red[] = {'N','L','S', 'S','S','W'}; //needs to be checked
 char greenP4[] = {'Z','R', 'S', 'R', 'X'}; //needs to be checked
-char redP4[] = {'Z','S','L','L', 'L', 'X'}; //needs to be checked
+char redP4[] = {'Z','S', 'S','L','L', 'L', 'X'}; //needs to be checked
 char P4Green[] = {'M','R','S', 'L', 'S', 'W'} ; //needs to be checked
 char P4Red[] = {'N','L','R', 'S', 'W'}; //needs to be checked
 char redFinish[] = {'M','L','J'}; //needs to have code written to not ignore, maybe new action instruction
 char greenFinish[] = {'N','R','J'}; //needs to have code written to not ignore, maybe new action instruction
 
-
+//Sets up the pointer to the current route. action[0] holds the next action (e.g. 'L') to be done
 char *action;
 
-//predefine function
+//Predefine functions
 void lineSensorRead();
 void lineFollowing();
 void lineFollowingStraight();
@@ -80,7 +114,6 @@ void turn_right();
 void turn_left();
 void navDecision();
 void actionTranslate(char action); 
-
 int rampedServoMove(Servo &servoLocal, int currentDegree, int desiredDegree, int increment, int timeDelay = 15);
 void openGripper();
 void closeGripper();
@@ -88,53 +121,64 @@ void liftGripper();
 void lowerGripper();
 void partialLowerGripper();
 
-//Ultrasound
+//Define variables for ultrasound output and calibration
 float distance = 0;
 float sensitivity = 0;
 
+//Predefine ultrasound distance sensing function
 float getUltrasoundSensorReading(int pin = A0, float ADC_SOLUTION = 1023.0, int MAX_ULTRASOUND_RANG = 520);
 
-
+//Predefine grabber mechanism functions
 bool captureBlock(int t);
 bool blockinRange(int range);
 bool dropBlock();
 
-//Color Sensor
+//Predefine colour sensor functions
 float getColorSensorReading(int pin = 9);
 bool colorDetection();
 
+//Function to toggle the blue LED (for the flashing while moving)
 void toggleLED(){
   digitalWrite(blueLEDPin, !digitalRead(blueLEDPin));
 }
 
+
+//Define the setup function
 void setup() {
+  //Attach servos to the correct Arduino pins
   liftServo.attach(7);
   gripperServo.attach(8);
+
+  //Position grabber mechanism to correct initial position (lifted, claw closed)
   liftServo.write(posLiftUp);
   posCurrentLift = posLiftUp;
   gripperServo.write(posGripperClose);
   posCurrentGripper = posGripperClose;
-  Serial.begin(9600);           
+
+  //Allow for Serial printing to the computer (for debugging)
+  Serial.begin(9600);       
+  //Initialise motor shield 
   if (!AFMS.begin()) {        
     Serial.println("Could not find Motor Shield. Check wiring.");
     while (1);
   }
+
+  //Set the mode of each pin (input or output) for the line sensors (inputs), LEDs (outputs) and button (input)
   pinMode(leftmostlinesensorPin, INPUT); // declare LED as output
   pinMode(leftlinesensorPin, INPUT); // declare Micro switch as input
   pinMode(rightlinesensorPin, INPUT); // declare LED as output
   pinMode(rightmostlinesensorPin, INPUT); // declare Micro switch as input
   pinMode(buttonPin, INPUT); // declare pushbutton as input
-
   pinMode(blueLEDPin, OUTPUT);
   pinMode(redLEDPin, OUTPUT);
   pinMode(greenLEDPin, OUTPUT);
 
-  // call the toggle_led function every 500 ms
+  //Call the toggle_led function every 500 ms, therefore the blue LED will flash at 2Hz
   timer.every(500, toggleLED);
 
+  //Initially set the action (current route) variable to the first route (from the start to pick-up 1)
   action = startP1; // define the action pointer to point to the address of the first element of the inital array
 }
-
 
 //main
 void loop() {
