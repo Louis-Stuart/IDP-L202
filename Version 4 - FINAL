@@ -81,23 +81,23 @@ bool run = true;
 //start - the start
 //green / red - the green / red delivery points
 //P1 / P2 / P3 / P4 - the pick-up points, P1 being the nearest, then each succesive pick-up is clockwise from P1
-char startP1[] = {'L', 'R', 'X'}; //correct
-char P1Green[] = {'N','L','L', 'W'}; //correct
-char P1Red[] = {'M','R', 'S', 'R', 'W'}; //correct
-char greenP2[] = {'Z', 'S', 'S', 'R', 'R', 'X'}; //correct
-char redP2[] = {'Z','S','S','S','L', 'R', 'X'}; //correct
-char P2Green[] = {'M', 'R', 'L', 'S' ,'S','S','W'}; //correct
-char P2Red[] = {'N','L','L', 'S', 'R', 'S', 'W'}; //correct
-char greenP3[] = {'Z','S','S','S','S','R','X'}; //correct
-char redP3[] = {'Z','S','S','S','L','X'}; //correct
-char P3Green[] = {'M','R','S','S', 'S', 'S', 'W'}; //needs to be checked
-char P3Red[] = {'N','L','S', 'S','S','W'}; //needs to be checked
-char greenP4[] = {'Z','R', 'S', 'R', 'X'}; //needs to be checked
-char redP4[] = {'Z','S', 'S','L','L', 'L', 'X'}; //needs to be checked
-char P4Green[] = {'M','R','S', 'L', 'S', 'W'} ; //needs to be checked
-char P4Red[] = {'N','L','R', 'S', 'W'}; //needs to be checked
-char redFinish[] = {'M','L','J'}; //needs to have code written to not ignore, maybe new action instruction
-char greenFinish[] = {'N','R','J'}; //needs to have code written to not ignore, maybe new action instruction
+char startP1[] = {'L', 'R', 'X'};
+char P1Green[] = {'N','L','L', 'W'};
+char P1Red[] = {'M','R', 'S', 'R', 'W'};
+char greenP2[] = {'Z', 'S', 'S', 'R', 'R', 'X'};
+char redP2[] = {'Z','S','S','S','L', 'R', 'X'};
+char P2Green[] = {'M', 'R', 'L', 'S' ,'S','S','W'};
+char P2Red[] = {'N','L','L', 'S', 'R', 'S', 'W'};
+char greenP3[] = {'Z','S','S','S','S','R','X'};
+char redP3[] = {'Z','S','S','S','L','X'};
+char P3Green[] = {'M','R','S','S', 'S', 'S', 'W'};
+char P3Red[] = {'N','L','S', 'S','S','W'};
+char greenP4[] = {'Z','R', 'S', 'R', 'X'};
+char redP4[] = {'Z','S', 'S','L', 'L', 'X'};
+char P4Green[] = {'M','R','S', 'L', 'S', 'W'};
+char P4Red[] = {'N','L','R', 'S', 'W'};
+char redFinish[] = {'M','L','J'};
+char greenFinish[] = {'N','R','J'};
 
 //Sets up the pointer to the current route. action[0] holds the next action (e.g. 'L') to be done
 char *action;
@@ -180,37 +180,53 @@ void setup() {
   action = startP1; // define the action pointer to point to the address of the first element of the inital array
 }
 
-//main
+//Main loop
 void loop() {
-
+//Until the button is pressed, the loop will remain in this while loop
+//When the button is pressed, this loop is exited and the robot will start to run
 while(digitalRead(buttonPin)==0) {
   delay(100);
-  Serial.println("Button is not pressed, do not move please");
 }
-Serial.println("Button is pressed, move please");
+
+//While run == true, i.e. the robot has not been told to stop once it has returned to the start
 while(run) {
+  //Increment the timer for the flashing blue LED
   timer.tick();
 
+  //Initially, routeCounter - 0 before leaving the start box
   if (routeCounter == 0) {
+    //The robot will go unconditionally straight for 1.5s
     straight(highSpeed, 1500);
+    //routeCounter is incremented (and won't be reset back to zero)
     routeCounter ++;
   }
+
+  //After leaving the startbox and while on the route (held in action), routeCounter = 1
   if (routeCounter == 1) {
-    
+    //'J' indicates to stop at the startbox on finish
     if (action[0] == 'J') {
+      //Robot will go unconditionally straight to enter the startbox, then stop
       straight(highSpeed, 1000);
       stop();
+      //Stops loop from running, robot is finished
       run = false;
     }
+
+    //'X' and 'W' both indicate action to stop
     if (action[0] == 'X' || action[0] == 'W'){
+      //'W' indicates to stop at a delivery point
       if (action[0] == 'W'){
+        //Delay for 0.5s (split up to allow for handling of flashing LED)
         delay(100);
         delay(100);
         delay(100);
         delay(100);
         delay(100);
+        //Stop and put down block
         stop();
         dropBlock();
+
+        //Set new route, based on delivCounter (number of blocks delivered) and whether the robot is currently at the red or green delivery points
         if (delivCounter == 0) {
           if (green) {
             action = greenP2;
@@ -235,6 +251,7 @@ while(run) {
             action = redP4;
         }
         }
+        //If this is the final delivery, stop
         if (delivCounter == 3) {
             stop();
             run = false;
@@ -245,12 +262,19 @@ while(run) {
             action = redFinish;
         }
         }
+        //Debugging: print the current route
         Serial.println(action);
+        //Delivery made, therefore increment delivCounter
         delivCounter++;
+        //Debugging: print delivCounter
         Serial.print("deliv counter");
         Serial.println(delivCounter);
       }
+
+      //'X' indicates to stop at the pick up point
       if (action[0] == 'X'){
+        //Capture the block, with given amount of time to line follow straight within the bay, calibrated for each bay
+        //e.g. for the first bay (no deliveries made yet), line follow straight for 60ms before capturing the block
         if (delivCounter == 0) {
           captureBlock(60);
         }
@@ -263,6 +287,8 @@ while(run) {
         if (delivCounter == 3) {
           captureBlock(50);
         }
+
+        //Set the next route based on the number of deliveries made and whether we should go to the green or red delivery points (decided in captureBlock())
         if (delivCounter == 0) {
           if (green) {
             action = P1Green;
@@ -295,19 +321,24 @@ while(run) {
             action = P4Red;
         }
         }
+
+        //Debugging: print the current route
         Serial.println(action);
+        //Stop and then increment routeCounter (to 2, indicating reversal out of pick-up point)
         stop();
         delay(1000);
         routeCounter++;
         }
       }
-      
+    
+    //If the current action is not one to stop, the robot should navigate along the route
     else{
       navDecision();
     }
   }
   
-  
+    //If routeCounter = 2, indicates reversal out of the pick-up point until either of the two outer line sensors hit the white line
+    //Then, routeCounter will be decremented back to 1 for navigation, including turning out of the pick-up point
     if (routeCounter == 2) {
       lineSensorRead();
       if (!lineSensors[0] && !lineSensors[3]) {
@@ -321,14 +352,19 @@ while(run) {
 }
 }
 
+//Define stop function, with optional t parameter for length of stop delay
 void stop(int t=0) {
+  //Set motor speeds to zero
   leftMotor->setSpeed(0);
   rightMotor->setSpeed(0);
   //might need to run(release)
   delay(t);
 }
 
+//Define function for driving straight, with parameter t for optional delay (i.e. go straight unconditionally for t ms)
+//Parameter speed is the speed of the motors (default is the highest speed, defined above)
 void straight(int speed=highSpeed, int t=0) {
+  //Set the motors to forward motion at the input speed
   leftMotor->run(forward);
   rightMotor->run(forward);
   leftMotor->setSpeed(speed);
@@ -336,7 +372,8 @@ void straight(int speed=highSpeed, int t=0) {
   delay(t);
 }
 
-void reverse(int speed, int t) {
+//Define function for reversing (opposite to going straight above)
+void reverse(int speed=highSpeed, int t=0) {
   leftMotor->run(backward);
   rightMotor->run(backward);
   leftMotor->setSpeed(speed);
@@ -344,75 +381,82 @@ void reverse(int speed, int t) {
   delay(t); 
 }
 
+//Define function for turning the robot
+//Parameters: high and low indicate the high and low speeds to be used
+//            left is true if the robot should turn left
+//            rev is true if the inside wheel should be reversed to tighten the turning circle
 void turn(int high, int low, bool left, bool rev) {
+  //If turn left, set the left motor to a low speed and the right motor to a high speed
   if(left){
+    //If rev = true, the inside wheel (left for left turn) should be set to go backwards to tighten the turning circle
     if (rev) {
       leftMotor->run(backward);
-      rightMotor->run(forward);
-      leftMotor->setSpeed(low);
-      rightMotor->setSpeed(high);
     }
+    //Otherwise, the inside wheel should go forwards
     if (!rev) {
       leftMotor->run(forward);
-      rightMotor->run(forward);
-      leftMotor->setSpeed(low);
-      rightMotor->setSpeed(high);
     }
+    //Set right motor t forwards, set left motor to low speed, set right motor to high speed (independent of rev)
+    rightMotor->run(forward);
+    leftMotor->setSpeed(low);
+    rightMotor->setSpeed(high);
   }
+  //For right turn, do opposite (set inside (right) wheel to reverse if rev is true, set right motor to low speed and left motor to high speed)
   else{
     if (rev) {
-      leftMotor->run(forward);
       rightMotor->run(backward);
-      leftMotor->setSpeed(high);
-      rightMotor->setSpeed(low);
     }
     if (!rev) {
-      leftMotor->run(forward);
       rightMotor->run(forward);
-      leftMotor->setSpeed(high);
-      rightMotor->setSpeed(low);
     }
+    leftMotor->run(forward);
+    leftMotor->setSpeed(high);
+    rightMotor->setSpeed(low);
   }
 }
 
+//Define specific left and right turn (for ease of use with the left Boolean parameter)
 void turn_left(int high, int low, bool rev) {
   turn(high,low,true, rev);
 }
-
 void turn_right(int high, int low, bool rev) {
   turn(high,low,false, rev);
 }
 
+//Define a function for updating the lineSensors array with the current line sensor readings
 void lineSensorRead(){
+  //Pos 0 = left-most (junction) line sensor
   lineSensors[0] = digitalRead(leftmostlinesensorPin);
+  //Pos 1 = left-centre (line-following) line sensor
   lineSensors[1] = digitalRead(leftlinesensorPin);
   lineSensors[2] = digitalRead(rightlinesensorPin);
   lineSensors[3] = digitalRead(rightmostlinesensorPin);
 }
 
+//Define a function for following a line (junction detection handled separately in lineFollowing)
+//Parameters are the high and low speeds for movement (low speed used in turning to get back on line)
 void lineFollowingStraight(int high, int low) {
+  //Read current line sensor values
   lineSensorRead();
-  // line sensing based on the two middle sensors always picking up white 
+  //If both middle sensors are white (1), then the line is being followed correctly
   if (lineSensors[1] && lineSensors[2]){
-    // sensor0=0, sensor1=1, sensor2=1, sensor3=0
-    Serial.println("straight");
+    //Go straight
     straight(high);
   }
 
-  // correction for staying on the line
+  //If right-centre line sensor is black (0) and the left-centre sensor white (1), then the robot is too far right
   if (lineSensors[1] && !lineSensors[2] ) {
-    // sensor0=0, sensor1=1, sensor2=0, sensor3=0
-    Serial.println("correct left");
+    //Turn left to correct back onto line
     turn_left(high, low, false);
   }
   
-  // correction for staying on the line
+  //If left-centre line sensor is black (0) and the right-centre sensor white (1), then the robot is too far left
   if (!lineSensors[1] && lineSensors[2] ) {
-    // sensor0=0, sensor1=0, sensor2=1, sensor3=0
-    Serial.println("correct right");
+    //Turn right to correct back onto line
     turn_right(high, low, false);
   }
 }
+
 
 void lineFollowing() {
   lineSensorRead();
