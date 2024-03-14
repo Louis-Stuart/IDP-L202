@@ -112,7 +112,6 @@ void reverse(int speed=highSpeed, int t=0);
 void turn(int high, int low, bool left);
 void turn_right();
 void turn_left();
-void navDecision();
 void actionTranslate(char action); 
 int rampedServoMove(Servo &servoLocal, int currentDegree, int desiredDegree, int increment, int timeDelay = 15);
 void openGripper();
@@ -333,7 +332,7 @@ while(run) {
     
     //If the current action is not one to stop, the robot should navigate along the route
     else{
-      navDecision();
+      lineFollowing();
     }
   }
   
@@ -435,6 +434,7 @@ void lineSensorRead(){
 
 //Define a function for following a line (junction detection handled separately in lineFollowing)
 //Parameters are the high and low speeds for movement (low speed used in turning to get back on line)
+//This has been separated from the main function to allow for use elsewhere (e.g. for aligning forward into pick-up point)
 void lineFollowingStraight(int high, int low) {
   //Read current line sensor values
   lineSensorRead();
@@ -457,66 +457,87 @@ void lineFollowingStraight(int high, int low) {
   }
 }
 
-
+//The main navigation function, which also handles junction detection
 void lineFollowing() {
+  //Update line sensor readings
   lineSensorRead();
+  //Debugging: print all current line sensors values
   Serial.print(lineSensors[0]);
   Serial.print(lineSensors[1]);
   Serial.print(lineSensors[2]);
   Serial.println(lineSensors[3]);
 
-
+  //Line follow along the straight line
   lineFollowingStraight(highSpeed, medSpeed);
 
-  // in case of a double t junction
+  //Below is the junction detection and handling
+  //Please refer to definition of routes for definitions of the actions
+
+  //if the two front line sensors read black (0), then (assuming the robot is not lost) it has driven just over a double-t-junction (__|__)
+  //If the action is not to rotate ('Z'), then handle this as a double-t-junction
   if (!lineSensors[1] && !lineSensors[2] && action[0] != 'Z') {
-    Serial.println("double t junction");
+    //Turn left or right (depending on current action) until the two front line sensors are brought back onto the line
     while (!(lineSensors[1] && lineSensors[2])) {
+      //While loop within the main loop, therefore must keep updating the line sensor readings
       lineSensorRead();
       if (action[0] == 'R') {
+        //Tight turning circle needed, therefore inner wheel set to reverse
         turn_right(250, 80, true); 
       }
       if (action[0] == 'L') {
         turn_left(250, 80, true); 
       }
       }
+    //Unconditionally line follow straight for some time, to avoid re-/mis-detection of the previous line as a new junction by the outer line sensors
     for (int i = 0; i <= 20; i += 1){
           lineFollowingStraight(250, 50);
           delay(10);
         }
+    //Increment action, therefore action[0] points to the next action in the current route
     action++;
     }
 
   
-  // in case of a single right t junction 
+  //Assuming the robot is on the line, if the left (outer) line sensor is black (0) and the right (outer) line sensor is white (1),
+  //then a right-t-junction has been detected (|--)
   if (!lineSensors[0] && lineSensors[1] && lineSensors[2] && lineSensors[3]){
-      Serial.println("t right junction");
+    //If the current action is to turn right
       if (action[0] == 'R') {
+        //Start to turn right (want tight turning circle, therefore inner wheel set to reverse)
         turn_right(250, 150, true);
+        //Unconditionally turn for 1 sec, therefore turn off the current line
+        //Delay split up to allow for flashing of blue LED
         delay(200);
         delay(200);
         delay(200);
         delay(200);
         delay(200);
+        //Then, try to detect the new line
+        //Keep turning until both front line sensors detect the new line, continuously updating the line sensor readings
         while (!(lineSensors[1] && lineSensors[2])) {
           lineSensorRead();
+          //Once the new line has been detected, increment action (this junction has been completed), and exit this loop
           if (lineSensors[1] && lineSensors[2]) {
             action ++;
           }
         }  
     }
+    //Otherwise (by the definition of the set routes above), the action must be 'S', to continue without turning
       if (action[0] == 'S'){
+        //Unconditionally line follow for a calibrated amount of time (1 second) to avoid redetection of the junction
         for (int i = 0; i <= 100; i += 1){
           lineFollowingStraight(250, 50);
           delay(10);
         }
+        //Junction detected, therefore increment action to point to the next action in the current route
         action ++;
       }
   }
 
-  // in case of a single left t junction 
+  //Assuming the robot is on the line, if the left (outer) line sensor is white (1) and the right (outer) line sensor is black (0)
+  //then a left-t-junction has been detected (--|)
+  //Same as right-t-junction above, but turning left instead of right
   if (lineSensors[0] && lineSensors[1] && lineSensors[2] && !lineSensors[3]){
-      Serial.println("t left junction");
       if (action[0] == 'L') {
         turn_left(250, 150, true);
         delay(200);
@@ -539,97 +560,121 @@ void lineFollowing() {
         action++;
       }
   }
-  //reverse
-    if (action[0] == 'N') { 
-      turn_left(200, 80, true);
-      delay(200);
-      delay(200);
-      delay(200);
-      delay(200);
-      delay(200);
-      delay(200);
-      while (!lineSensors[1] && !lineSensors[2]) {
-        lineSensorRead();
-      }
-      action ++;
+
+  //If the next action is 'N' (at start of route from pick-up point, after reversing)
+  //Turn left out of pick-up point
+  if (action[0] == 'N') { 
+    //Start to turn left (tight turning circle, therefore inner wheel set to reverse)
+    turn_left(200, 80, true);
+    //Turn left unconditionally for 1 sec (split up to allow for blue LED flashing) until off of line into pick-up point
+    delay(200);
+    delay(200);
+    delay(200);
+    delay(200);
+    delay(200);
+    delay(200);
+    //Continue to turn left until both front line sensors are on the new line
+    while (!lineSensors[1] && !lineSensors[2]) {
+      //Continuously update line sensor readings
+      lineSensorRead();
     }
-    if (action[0] == 'M') {
-      turn_right(200, 150, true);
-      delay(200);
-      delay(200);
-      delay(200);
-      delay(200);
-      delay(200);
-      delay(200);
-      while (!lineSensors[1] && !lineSensors[2]) {
-        lineSensorRead();
-      }
-      action ++;
+    //Once on the new line, increment action to point to the next action along the current route
+    action ++;
+  }
+
+  //If the next action is 'M' (at start of route from pick-up point, after reversing)
+  //Turn right out of pick-up point
+  //Same as above, but turn right instead
+  if (action[0] == 'M') {
+    turn_right(200, 150, true);
+    delay(200);
+    delay(200);
+    delay(200);
+    delay(200);
+    delay(200);
+    delay(200);
+    while (!lineSensors[1] && !lineSensors[2]) {
+      lineSensorRead();
     }
-    if (action[0] == 'Z') {
-      Serial.println("we are turning out of the bay hopefully");
-      if (green) {
-        turn_left(250,250,true);
-      }
-      else{
-        turn_right(250,250,true);
-      }
-      delay(2400);
-      while (!(lineSensors[1] && lineSensors[2])) {
-        Serial.println("turning");
-        lineSensorRead();
-      }
-      action++;
+    action ++;
+  }
+
+  //If next action is 'Z'. then rotate 180 degrees out of delivery point
+  if (action[0] == 'Z') {
+    //Must turn in a specific direction depending on which delivery point the robot is at to avoid the hitting the wall
+    //If at the green delivery point, start to turn left
+    if (green) {
+      //Inner wheel set to reverse, both at same (high) speed, therefore effectively spins on the spot
+      turn_left(250,250,true);
     }
+    //If at the red delivery point, start to turn right
+    else{
+      turn_right(250,250,true);
+    }
+    //Turn unconditionally for 2.4 seconds.
+    //This has been calibrated to bring the robot (it's name is Sebastian) off of the line, then over the first line undetected
+    delay(2400);
+    //Continue to turn past the first line until the second line (i.e. opposite the delivery point) has been detected (by the front 2 line sensors)
+    while (!(lineSensors[1] && lineSensors[2])) {
+      //Continuously update line sensor readings while turning
+      lineSensorRead();
+    }
+    //Once on the new line, increment action to point to the next action along the current route
+    action++;
+  }
 }
 
-void navDecision() {
-    lineSensorRead();
-    Serial.println(action[0]);
-    lineFollowing();
-    }
-
-
-
+//Define functions to move the gripper mechanism,
+//by calling the rampedServoMove function with the required servo, correct position limits and degree increment
 void liftGripper() {
   posCurrentLift = rampedServoMove(liftServo, posCurrentLift, posLiftUp, 1);
 }
-
 void lowerGripper() {
   posCurrentLift = rampedServoMove(liftServo, posCurrentLift, posLiftDown, 1);
 }
-
 void partialLowerGripper() {
   posCurrentLift = rampedServoMove(liftServo, posCurrentLift, posPartialLiftDown, 1);
 }
-
 void openGripper() {
   posCurrentGripper = rampedServoMove(gripperServo, posCurrentGripper, posGripperOpen, 1);
 }
-
 void closeGripper() {
   posCurrentGripper = rampedServoMove(gripperServo, posCurrentGripper, posGripperClose, 1);
 }
 
+//Define the general function to move a servo
+//Parameters are Servo (the servo to move), the current and desired position of this servo and how much to increment this position over the period timeDelat
 int rampedServoMove(Servo &servoLocal, int currentDegree, int desiredDegree, int increment, int timeDelay = 15) {
+  //If required angle is greater than current, then increment the servo forwards towards the desired angle
   if (currentDegree < desiredDegree) {
+    //Each time period (timeDelay ms long), do one increment
     for (; currentDegree <= desiredDegree; currentDegree += increment) {
       servoLocal.write(currentDegree);
       delay(timeDelay);
     }
-  } else {
+  }
+  //If required angle is less than current, then decrement the servo towards the desired angle
+  else {
+    //Each time period (timeDelay ms long), do one decrement
     for (; currentDegree >= desiredDegree; currentDegree -= increment) {
       servoLocal.write(currentDegree);
       delay(timeDelay);
     }
   }
+  //return the desired degree, i.e. the angle that the servo is now positioned at
   return desiredDegree;
 }
 
-
+//The ultrasound sensor is used during the pick-up of a block to ensure that the block is in range to be picked up
+//This function returns the current distance, in cm, to the block (or any object in front of the sensor)
+//Parameters are the pin that the line sensor is connected to (default is Analog 0),
+//and two calibration values (one for converting from analogue to digital readings and the other for denoting the total range of distances)
 float getUltrasoundSensorReading(int pin = A0, float ADC_SOLUTION = 1023.0, int MAX_ULTRASOUND_RANG = 520) {
+  //read the sensitivity, i.e. the current analogue (converted to digital) reading from the sensor
   sensitivity = analogRead(pin);
+  //the current distance is equal to the proportion of the current reading out of the total reading range, multiplied by the total dist range
   distance = sensitivity * MAX_ULTRASOUND_RANG / ADC_SOLUTION;
+  //Print distnace and also return
   Serial.print(distance, 0);
   Serial.println("cm");
   return distance;
