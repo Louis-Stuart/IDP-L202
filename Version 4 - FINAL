@@ -133,8 +133,8 @@ bool blockinRange(int range);
 bool dropBlock();
 
 //Predefine colour sensor functions
-float getColorSensorReading(int pin = 9);
-bool colorDetection();
+float getColourSensorReading(int pin = 9);
+bool colourDetection();
 
 //Function to toggle the blue LED (for the flashing while moving)
 void toggleLED(){
@@ -680,10 +680,14 @@ float getUltrasoundSensorReading(int pin = A0, float ADC_SOLUTION = 1023.0, int 
   return distance;
 }
 
-
+//Defines the function for determining if the block is within range of being picked up by the grabber mechanism
+//Parameter range is the maximum distance in cm for which the grabber can pick up the block
 bool blockinRange(int range) {
+  //Check 3 times whether the block is in range, each time reading a new ultrasound distance, to mitigate random noise in the reading
   for (int i = 0; i < 2; i++) {
+    //If the block is in range (the current reading is less than the maximum range)
     if (getUltrasoundSensorReading() < range) {
+      //Only output true (block is in range) if the block is in range for both the first and second checks
       if (i == 1) {  // If it's the second iteration and the block is still in range
         Serial.println("True returned in blockinRange");
         return true;
@@ -693,108 +697,87 @@ bool blockinRange(int range) {
       return false;  // If the block is not in range in the first check, no need to wait or check again
     }
   }
-  return false;  // In case the block was in range during the first check but not the second
+  return false;  // In case the block was in range during the first check but not the second, output false
 }
 
-
+//Defines the process for picking up a block
+//Parameter t is the time in ms for which the robot should line follow straight within the bay to align itself and reach the block
 bool captureBlock(int t) {
+  //Defines the number of attempts to detect and pick up the block, otherwise the robot should move on to the next block
+  int maxAttempts = 5;
+
+  //Firsty, stop the current motion
   stop();
 
+  //Robot should reverse for 1 second in order to give enough space for alignment and lowering the grabber mechanism
   reverse(180, 1000);
   stop();
 
-  int maxAttempts = 5;
-  closeGripper();  // Ensure gripper closed before lowering it
+  // Due to physical limitations, the gripper must be closed before it can be lifted into / dropped from the vertical position
+  closeGripper();
   delay(500);
-
+  //Lower the gripper, then open the arm
   lowerGripper();
   delay(100);
-
   openGripper();
 
-  /*while (getUltrasoundSensorReading() >= 5) {
-    Serial.println(getUltrasoundSensorReading());
-    lineFollowingStraight(150, 30);
-  }*/
-
+  //For an amount of time t, calibrated for each pick-up point, line follow straight to align the robot and to esnure the block is within the grabber
   for (int i = 0; i <= t; i += 1){
     lineFollowingStraight(250, 50);
     delay(10);
   }
   stop();
 
-  int count = 0;
-  while (!blockinRange(5) && count < maxAttempts) {  // Keep checking if the block is in range, up to max attempt
-    Serial.println("In Loop");
-    count++;
+  //Close the gripper
+  closeGripper();
+
+  //Detect the colour of the block, returns true if red, therefore green is true if colourDetection (red) is false
+  green = !(colourDetection()); 
+
+  //light correct LED based on found colour, turn off incorrect LED, stay stationary for 5 secs, as per rules
+  if (green){
+    digitalWrite(redLEDPin, LOW);
+    digitalWrite(greenLEDPin, HIGH);
+    delay(5000);
   }
+  else{
+    digitalWrite(greenLEDPin, LOW);
+    digitalWrite(redLEDPin, HIGH);
+    delay(5000);
+  }
+
+  //Reverse for a bit, to prevent block scraping back of pick-up point
+  reverse(180, 150);
   stop();
 
+  //Lift the grabber and block
+  liftGripper();
+  delay(100);
+
+  //If the block is in reach of the grabber mechanism (calibrated as 5cm)
   if (blockinRange(5)) {
-    closeGripper();
-
-    green = !(colorDetection()); 
-
-    //light correct LED based on found colour, turn off incorrect LED, stay stationary for 5 secs, as per rules
-    if (green){
-      digitalWrite(redLEDPin, LOW);
-      digitalWrite(greenLEDPin, HIGH);
-      delay(5000);
-    }
-    else{
-      digitalWrite(greenLEDPin, LOW);
-      digitalWrite(redLEDPin, HIGH);
-      delay(5000);
-    }
-
-    reverse(180, 150);
-    stop();
-
-    liftGripper();
-    delay(100);
-
     return true;  // Indicate the block has been captured with confidence
-  } else {
-    closeGripper();
-    delay(100);
-
-    /*
-    if (colorDetection()) {
-      green = false;
-    }
-    Serial.print("Green:");
-    Serial.println(green);
-    */
-
-    green = !(colorDetection()); 
-
-    //light correct LED based on found colour, turn off incorrect LED, stay stationary for 5 secs, as per rules
-    if (green){
-      digitalWrite(redLEDPin, LOW);
-      digitalWrite(greenLEDPin, HIGH);
-      delay(5000);
-    }
-    else{
-      digitalWrite(greenLEDPin, LOW);
-      digitalWrite(redLEDPin, HIGH);
-      delay(5000);
-    }
-
-    liftGripper();
-    delay(100);
+  }
+  //If the block is not in range
+  else {
     return false;  // Indicate that the block capture was completed in doubt
-    // We could update this place to a pure return to false, and then implement another loop outside to allow it moves randomly to the front/back a bit with the gripper lowered, and then we restart the function from the top in that loop
   }
 }
 
+//Defines the function for lowering and releasing the block at the delivery point
 bool dropBlock(){
+  //Line follow towards the delivery point for a calibrated amount of time to align the robot
   for (int i = 0; i <= 50; i += 1){
     lineFollowingStraight(250, 50);
     delay(10);
   }
   stop();
+
+  //Lower the grabber mechanism arm half way, to allow for block stacking 
   partialLowerGripper();
   delay(100);
+
+  //Open the gripper to release the block, reverse to avoid re-picking-up the block, then close and lift the mechanism
   openGripper();
   delay(100);
   reverse(180,700);
@@ -804,23 +787,27 @@ bool dropBlock(){
   liftGripper();
 }
 
-
+//Define a function for reading the colour sensor value
 //Return true if RED
-float getColorSensorReading(int pin = 9) {
+float getColourSensorReading(int pin = 9) {
   return digitalRead(pin);
 }
 
-
+//Defines a function for accurately determining the colour of the block, i.e. not just detecting the colour once
 //Return true if RED
-bool colorDetection() {
+bool colourDetection() {
   bool previousDetection, currentDetection;
   int attempts = 10;  // Max number of attempts before giving a less confident value returned
 
-  previousDetection = getColorSensorReading();
+  //Detetct the block colour for the first time
+  previousDetection = getColourSensorReading();
+  //Repeat for the number of attempts specified above
   for (int i = 0; i < attempts; i++) {
     delay(100);  // Wait before taking the next reading
-    currentDetection = getColorSensorReading();
+    currentDetection = getColourSensorReading();
 
+    //If the previous and new readings match, then deem the reading to be stable and return from the fucntion
+    //Otherwise, move onto the next attempt to try to get a stable reading
     if (previousDetection == currentDetection) {
       return previousDetection;  // Return the stable detection value
     }
@@ -829,5 +816,6 @@ bool colorDetection() {
   }
 
   //Handle the case where a stable reading couldn't be obtained
+  //Return the current reading, although this is not as confident, but better than not returning a value
   return currentDetection;
 }
